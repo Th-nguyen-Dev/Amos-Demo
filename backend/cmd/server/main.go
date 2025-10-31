@@ -1,0 +1,225 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/jmoiron/sqlx"
+	_ "github.com/mattn/go-sqlite3"
+
+	"smart-company-discovery/internal/api/handlers"
+	"smart-company-discovery/internal/api/middleware"
+	"smart-company-discovery/internal/clients"
+	"smart-company-discovery/internal/config"
+	"smart-company-discovery/internal/models"
+	"smart-company-discovery/internal/repository"
+	"smart-company-discovery/internal/service"
+)
+
+func main() {
+	// Load configuration
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Printf("Failed to load configuration: %v, using defaults", err)
+		cfg = &models.Config{
+			Server: models.ServerConfig{
+				Port:        8080,
+				Host:        "0.0.0.0",
+				Environment: "development",
+			},
+		}
+	}
+
+	// Connect to SQLite database for testing
+	db, err := sqlx.Connect("sqlite3", "smart_discovery.db")
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer db.Close()
+
+	// Enable foreign key constraints
+	_, err = db.Exec("PRAGMA foreign_keys = ON")
+	if err != nil {
+		log.Fatalf("Failed to enable foreign keys: %v", err)
+	}
+
+	// Read and execute migration if tables don't exist
+	var tableCount int
+	err = db.Get(&tableCount, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='qa_pairs'")
+	if err == nil && tableCount == 0 {
+		log.Println("Running database migrations...")
+		migrationSQL, err := os.ReadFile("migrations/001_init_schema_sqlite.sql")
+		if err != nil {
+			log.Fatalf("Failed to read migration file: %v", err)
+		}
+
+		_, err = db.Exec(string(migrationSQL))
+		if err != nil {
+			log.Fatalf("Failed to run migration: %v", err)
+		}
+		log.Println("✓ Database migrations completed")
+	}
+
+	log.Println("Successfully connected to database")
+
+	// Initialize Pinecone client (using mock)
+	pineconeClient := clients.NewMockPineconeClient()
+
+	// Initialize repositories
+	qaRepo := repository.NewQARepository(db)
+	convRepo := repository.NewConversationRepository(db)
+
+	// Initialize services
+	qaService := service.NewQAService(qaRepo, pineconeClient)
+	convService := service.NewConversationService(convRepo)
+
+	// Initialize handlers
+	qaHandler := handlers.NewQAHandler(qaService)
+	convHandler := handlers.NewConversationHandler(convService)
+
+	// Setup Gin router
+	gin.SetMode(gin.ReleaseMode)
+	router := gin.Default()
+
+	// Apply middleware
+	router.Use(middleware.CORS())
+
+	// Health check
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "healthy", "database": "connected"})
+	})
+
+	// API routes for React UI
+	api := router.Group("/api")
+	{
+		// Q&A endpoints
+		api.GET("/qa-pairs", qaHandler.ListQA)
+		api.GET("/qa-pairs/:id", qaHandler.GetQA)
+		api.POST("/qa-pairs", qaHandler.CreateQA)
+		api.PUT("/qa-pairs/:id", qaHandler.UpdateQA)
+		api.DELETE("/qa-pairs/:id", qaHandler.DeleteQA)
+
+		// Conversation endpoints
+		api.POST("/conversations", convHandler.CreateConversation)
+		api.GET("/conversations", convHandler.ListConversations)
+		api.GET("/conversations/:id", convHandler.GetConversation)
+		api.DELETE("/conversations/:id", convHandler.DeleteConversation)
+		api.POST("/conversations/:id/messages", convHandler.AddMessage)
+		api.GET("/conversations/:id/messages", convHandler.GetMessages)
+	}
+
+	// Tool endpoints for Python service
+	tools := router.Group("/tools")
+	{
+		tools.POST("/search-qa", func(c *gin.Context) {
+			var req models.SearchQARequest
+			if err := c.ShouldBindJSON(&req); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			params := models.NewCursorParams()
+			params.Limit = req.Limit
+
+			qaPairs, _, err := qaService.SearchQA(c.Request.Context(), req.Query, params)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			result := make([]models.QAPair, len(qaPairs))
+			for i, qa := range qaPairs {
+				result[i] = *qa
+			}
+
+			c.JSON(http.StatusOK, models.SearchQAResponse{
+				QAPairs: result,
+				Count:   len(result),
+			})
+		})
+
+		tools.POST("/get-qa-by-ids", func(c *gin.Context) {
+			var req models.GetQAByIDsRequest
+			if err := c.ShouldBindJSON(&req); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			qaPairs, err := qaService.GetQAByIDs(c.Request.Context(), req.IDs)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			result := make([]models.QAPair, len(qaPairs))
+			for i, qa := range qaPairs {
+				result[i] = *qa
+			}
+
+			c.JSON(http.StatusOK, models.GetQAByIDsResponse{QAPairs: result})
+		})
+
+		tools.POST("/save-message", func(c *gin.Context) {
+			var req models.SaveMessageRequest
+			if err := c.ShouldBindJSON(&req); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			msgReq := models.CreateMessageRequest{
+				ConversationID: req.ConversationID,
+				Role:           req.Role,
+				Content:        req.Content,
+				ToolCallID:     req.ToolCallID,
+				RawMessage:     req.RawMessage,
+			}
+
+			msg, err := convService.AddMessage(c.Request.Context(), msgReq)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.JSON(http.StatusCreated, models.SaveMessageResponse{Message: *msg})
+		})
+	}
+
+	// Create HTTP server
+	srv := &http.Server{
+		Addr:    fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
+		Handler: router,
+	}
+
+	// Start server in goroutine
+	go func() {
+		log.Printf("🚀 Server starting on http://%s:%d", cfg.Server.Host, cfg.Server.Port)
+		log.Printf("📊 Health check: http://localhost:%d/health", cfg.Server.Port)
+		log.Printf("📝 API docs: http://localhost:%d/api/qa-pairs", cfg.Server.Port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Failed to start server: %v", err)
+		}
+	}()
+
+	// Wait for interrupt signal to gracefully shutdown the server
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	log.Println("Server exited")
+}
