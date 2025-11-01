@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: smart-discovery-db
+    environment:
+      POSTGRES_USER: smart_user
+      POSTGRES_PASSWORD: smart_password
+      POSTGRES_DB: smart_discovery
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/migrations:/docker-entrypoint-initdb.d/
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smart_user"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - smart-discovery-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smart-discovery-api
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: smart_user
+      DB_PASSWORD: smart_password
+      DB_NAME: smart_discovery
+      DB_SSLMODE: disable
+      SERVER_PORT: 8080
+      SERVER_HOST: 0.0.0.0
+      SERVER_ENVIRONMENT: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    networks:
+      - smart-discovery-network
+
+volumes:
+  postgres_data:
+
+networks:
+  smart-discovery-network:
+    driver: bridge
+

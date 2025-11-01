@@ -70,4 +70,3 @@ func (c *MockPineconeClient) Delete(ctx context.Context, id string) error {
 	delete(c.vectors, id)
 	return nil
 }
-

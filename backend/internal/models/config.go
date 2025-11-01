@@ -34,4 +34,3 @@ func (c DatabaseConfig) ConnectionString() string {
 		c.Host, c.Port, c.User, c.Password, c.DBName, c.SSLMode,
 	)
 }
-

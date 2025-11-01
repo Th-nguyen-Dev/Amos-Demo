@@ -74,4 +74,3 @@ type SaveMessageRequest struct {
 type SaveMessageResponse struct {
 	Message Message `json:"message"`
 }
-

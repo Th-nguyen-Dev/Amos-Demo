@@ -5,9 +5,10 @@ import (
 	"database/sql"
 	"fmt"
 
+	"smart-company-discovery/internal/models"
+
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
-	"smart-company-discovery/internal/models"
 )
 
 // QARepository defines Q&A data access operations
@@ -33,24 +34,28 @@ func NewQARepository(db *sqlx.DB) QARepository {
 
 // Create creates a new Q&A pair
 func (r *qaRepository) Create(ctx context.Context, qa *models.QAPair) error {
-	qa.ID = uuid.New()
-
-	query := `INSERT INTO qa_pairs (id, question, answer) VALUES (?, ?, ?)`
-	_, err := r.db.ExecContext(ctx, query, qa.ID.String(), qa.Question, qa.Answer)
+	var err error
+	qa.ID, err = uuid.NewV7()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to generate UUID: %w", err)
 	}
 
-	return r.db.GetContext(ctx, qa, "SELECT * FROM qa_pairs WHERE id = ?", qa.ID.String())
+	query := `
+		INSERT INTO qa_pairs (id, question, answer) 
+		VALUES ($1, $2, $3)
+		RETURNING id, question, answer, created_at, updated_at
+	`
+
+	return r.db.QueryRowxContext(ctx, query, qa.ID, qa.Question, qa.Answer).StructScan(qa)
 }
 
 // GetByID retrieves a Q&A pair by UUID
 func (r *qaRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.QAPair, error) {
 	var qa models.QAPair
 
-	query := `SELECT id, question, answer, created_at, updated_at FROM qa_pairs WHERE id = ?`
+	query := `SELECT id, question, answer, created_at, updated_at FROM qa_pairs WHERE id = $1`
 
-	err := r.db.GetContext(ctx, &qa, query, id.String())
+	err := r.db.GetContext(ctx, &qa, query, id)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -83,21 +88,21 @@ func (r *qaRepository) GetByIDs(ctx context.Context, ids []uuid.UUID) ([]*models
 
 // Update updates an existing Q&A pair
 func (r *qaRepository) Update(ctx context.Context, qa *models.QAPair) error {
-	query := `UPDATE qa_pairs SET question = ?, answer = ? WHERE id = ?`
+	query := `
+		UPDATE qa_pairs 
+		SET question = $1, answer = $2 
+		WHERE id = $3
+		RETURNING id, question, answer, created_at, updated_at
+	`
 
-	_, err := r.db.ExecContext(ctx, query, qa.Question, qa.Answer, qa.ID.String())
-	if err != nil {
-		return err
-	}
-
-	return r.db.GetContext(ctx, qa, "SELECT * FROM qa_pairs WHERE id = ?", qa.ID.String())
+	return r.db.QueryRowxContext(ctx, query, qa.Question, qa.Answer, qa.ID).StructScan(qa)
 }
 
 // Delete deletes a Q&A pair
 func (r *qaRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	query := `DELETE FROM qa_pairs WHERE id = ?`
+	query := `DELETE FROM qa_pairs WHERE id = $1`
 
-	result, err := r.db.ExecContext(ctx, query, id.String())
+	result, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}
@@ -136,11 +141,11 @@ func (r *qaRepository) List(ctx context.Context, params models.CursorParams) ([]
 		}
 
 		if params.Direction == "prev" {
-			whereClauses = append(whereClauses, "id > ?")
+			whereClauses = append(whereClauses, "created_at > (SELECT created_at FROM qa_pairs WHERE id = $1)")
 		} else {
-			whereClauses = append(whereClauses, "id < ?")
+			whereClauses = append(whereClauses, "created_at < (SELECT created_at FROM qa_pairs WHERE id = $1)")
 		}
-		args = append(args, cursorID.String())
+		args = append(args, cursorID)
 	}
 
 	whereSQL := ""
@@ -160,8 +165,8 @@ func (r *qaRepository) List(ctx context.Context, params models.CursorParams) ([]
 		FROM qa_pairs
 		%s
 		ORDER BY created_at %s
-		LIMIT ?
-	`, whereSQL, order)
+		LIMIT $%d
+	`, whereSQL, order, len(args)+1)
 
 	args = append(args, fetchLimit)
 
@@ -194,7 +199,7 @@ func (r *qaRepository) List(ctx context.Context, params models.CursorParams) ([]
 	return qaPairs, pagination, nil
 }
 
-// SearchFullText performs full-text search (simplified for SQLite)
+// SearchFullText performs full-text search using PostgreSQL's built-in FTS
 func (r *qaRepository) SearchFullText(ctx context.Context, searchQuery string, params models.CursorParams) ([]*models.QAPair, *models.CursorPagination, error) {
 	if params.Limit < 1 {
 		params.Limit = 10
@@ -203,20 +208,19 @@ func (r *qaRepository) SearchFullText(ctx context.Context, searchQuery string, p
 		params.Limit = 100
 	}
 
-	// Simple LIKE search for SQLite
+	// PostgreSQL full-text search with ranking
 	query := `
 		SELECT id, question, answer, created_at, updated_at
 		FROM qa_pairs
-		WHERE question LIKE ? OR answer LIKE ?
-		ORDER BY created_at DESC
-		LIMIT ?
+		WHERE to_tsvector('english', question || ' ' || answer) @@ plainto_tsquery('english', $1)
+		ORDER BY ts_rank(to_tsvector('english', question || ' ' || answer), plainto_tsquery('english', $1)) DESC
+		LIMIT $2
 	`
 
-	searchPattern := "%" + searchQuery + "%"
 	fetchLimit := params.Limit + 1
 
 	var qaPairs []*models.QAPair
-	err := r.db.SelectContext(ctx, &qaPairs, query, searchPattern, searchPattern, fetchLimit)
+	err := r.db.SelectContext(ctx, &qaPairs, query, searchQuery, fetchLimit)
 	if err != nil {
 		return nil, nil, err
 	}

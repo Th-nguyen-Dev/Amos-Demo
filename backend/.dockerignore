@@ -1,0 +1,28 @@
+# SQLite databases
+*.db
+test.db
+smart_discovery.db
+
+# Documentation
+*.md
+README.md
+TEST_RESULTS.md
+
+# Git
+.git
+.gitignore
+
+# Test files
+*_test.go
+test_setup.go
+final_api_test.sh
+
+# Binaries
+server
+*.exe
+*.out
+
+# IDE
+.vscode
+.idea
+

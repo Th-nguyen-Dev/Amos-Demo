@@ -12,7 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/lib/pq"
 
 	"smart-company-discovery/internal/api/handlers"
 	"smart-company-discovery/internal/api/middleware"
@@ -37,37 +37,25 @@ func main() {
 		}
 	}
 
-	// Connect to SQLite database for testing
-	db, err := sqlx.Connect("sqlite3", "smart_discovery.db")
+	// Connect to PostgreSQL database
+	connStr := cfg.Database.ConnectionString()
+	db, err := sqlx.Connect("postgres", connStr)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
 
-	// Enable foreign key constraints
-	_, err = db.Exec("PRAGMA foreign_keys = ON")
-	if err != nil {
-		log.Fatalf("Failed to enable foreign keys: %v", err)
+	// Configure connection pool
+	db.SetMaxOpenConns(cfg.Database.MaxOpenConns)
+	db.SetMaxIdleConns(cfg.Database.MaxIdleConns)
+	db.SetConnMaxLifetime(5 * time.Minute)
+
+	// Test database connection
+	if err := db.Ping(); err != nil {
+		log.Fatalf("Failed to ping database: %v", err)
 	}
 
-	// Read and execute migration if tables don't exist
-	var tableCount int
-	err = db.Get(&tableCount, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='qa_pairs'")
-	if err == nil && tableCount == 0 {
-		log.Println("Running database migrations...")
-		migrationSQL, err := os.ReadFile("migrations/001_init_schema_sqlite.sql")
-		if err != nil {
-			log.Fatalf("Failed to read migration file: %v", err)
-		}
-
-		_, err = db.Exec(string(migrationSQL))
-		if err != nil {
-			log.Fatalf("Failed to run migration: %v", err)
-		}
-		log.Println("✓ Database migrations completed")
-	}
-
-	log.Println("Successfully connected to database")
+	log.Println("✓ Successfully connected to PostgreSQL database")
 
 	// Initialize Pinecone client (using mock)
 	pineconeClient := clients.NewMockPineconeClient()

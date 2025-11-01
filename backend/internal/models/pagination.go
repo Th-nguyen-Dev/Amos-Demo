@@ -19,8 +19,7 @@ type CursorPagination struct {
 // NewCursorParams creates default cursor params
 func NewCursorParams() CursorParams {
 	return CursorParams{
-		Limit:     10,
+		Limit:     50,
 		Direction: "next",
 	}
 }
-

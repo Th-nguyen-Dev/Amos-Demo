@@ -5,11 +5,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"time"
+
+	"smart-company-discovery/internal/models"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
-	"smart-company-discovery/internal/models"
 )
 
 // ConversationRepository defines conversation data access operations
@@ -33,24 +33,28 @@ func NewConversationRepository(db *sqlx.DB) ConversationRepository {
 
 // CreateConversation creates a new conversation
 func (r *conversationRepository) CreateConversation(ctx context.Context, conv *models.Conversation) error {
-	conv.ID = uuid.New()
-
-	query := `INSERT INTO conversations (id, title) VALUES (?, ?)`
-	_, err := r.db.ExecContext(ctx, query, conv.ID.String(), conv.Title)
+	var err error
+	conv.ID, err = uuid.NewV7()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to generate UUID: %w", err)
 	}
 
-	return r.db.GetContext(ctx, conv, "SELECT * FROM conversations WHERE id = ?", conv.ID.String())
+	query := `
+		INSERT INTO conversations (id, title) 
+		VALUES ($1, $2)
+		RETURNING id, title, created_at, updated_at
+	`
+
+	return r.db.QueryRowxContext(ctx, query, conv.ID, conv.Title).StructScan(conv)
 }
 
 // GetConversation retrieves a conversation by UUID
 func (r *conversationRepository) GetConversation(ctx context.Context, id uuid.UUID) (*models.Conversation, error) {
 	var conv models.Conversation
 
-	query := `SELECT id, title, created_at, updated_at FROM conversations WHERE id = ?`
+	query := `SELECT id, title, created_at, updated_at FROM conversations WHERE id = $1`
 
-	err := r.db.GetContext(ctx, &conv, query, id.String())
+	err := r.db.GetContext(ctx, &conv, query, id)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -79,11 +83,11 @@ func (r *conversationRepository) ListConversations(ctx context.Context, params m
 		}
 
 		if params.Direction == "prev" {
-			whereClauses = append(whereClauses, "id > ?")
+			whereClauses = append(whereClauses, "created_at > (SELECT created_at FROM conversations WHERE id = $1)")
 		} else {
-			whereClauses = append(whereClauses, "id < ?")
+			whereClauses = append(whereClauses, "created_at < (SELECT created_at FROM conversations WHERE id = $1)")
 		}
-		args = append(args, cursorID.String())
+		args = append(args, cursorID)
 	}
 
 	whereSQL := ""
@@ -103,8 +107,8 @@ func (r *conversationRepository) ListConversations(ctx context.Context, params m
 		FROM conversations
 		%s
 		ORDER BY created_at %s
-		LIMIT ?
-	`, whereSQL, order)
+		LIMIT $%d
+	`, whereSQL, order, len(args)+1)
 
 	args = append(args, fetchLimit)
 
@@ -139,9 +143,9 @@ func (r *conversationRepository) ListConversations(ctx context.Context, params m
 
 // DeleteConversation deletes a conversation
 func (r *conversationRepository) DeleteConversation(ctx context.Context, id uuid.UUID) error {
-	query := `DELETE FROM conversations WHERE id = ?`
+	query := `DELETE FROM conversations WHERE id = $1`
 
-	result, err := r.db.ExecContext(ctx, query, id.String())
+	result, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}
@@ -160,9 +164,13 @@ func (r *conversationRepository) DeleteConversation(ctx context.Context, id uuid
 
 // CreateMessage creates a new message
 func (r *conversationRepository) CreateMessage(ctx context.Context, msg *models.Message) error {
-	msg.ID = uuid.New()
+	var err error
+	msg.ID, err = uuid.NewV7()
+	if err != nil {
+		return fmt.Errorf("failed to generate UUID: %w", err)
+	}
 
-	// Convert raw_message to JSON string for SQLite
+	// Convert raw_message to JSONB for PostgreSQL
 	rawMessageJSON, err := json.Marshal(msg.RawMessage)
 	if err != nil {
 		return fmt.Errorf("failed to marshal raw_message: %w", err)
@@ -170,32 +178,12 @@ func (r *conversationRepository) CreateMessage(ctx context.Context, msg *models.
 
 	query := `
 		INSERT INTO messages (id, conversation_id, role, content, tool_call_id, raw_message)
-		VALUES (?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING created_at
 	`
 
-	_, err = r.db.ExecContext(ctx, query,
-		msg.ID.String(), msg.ConversationID.String(), msg.Role, msg.Content, msg.ToolCallID, string(rawMessageJSON))
-	if err != nil {
-		return err
-	}
-
-	// Fetch the created message (excluding raw_message which we already have)
-	var tempMsg struct {
-		ID             string     `db:"id"`
-		ConversationID string     `db:"conversation_id"`
-		Role           string     `db:"role"`
-		Content        *string    `db:"content"`
-		ToolCallID     *string    `db:"tool_call_id"`
-		CreatedAt      time.Time  `db:"created_at"`
-	}
-
-	err = r.db.GetContext(ctx, &tempMsg, "SELECT id, conversation_id, role, content, tool_call_id, created_at FROM messages WHERE id = ?", msg.ID.String())
-	if err != nil {
-		return err
-	}
-
-	msg.CreatedAt = tempMsg.CreatedAt
-	return nil
+	return r.db.QueryRowContext(ctx, query,
+		msg.ID, msg.ConversationID, msg.Role, msg.Content, msg.ToolCallID, rawMessageJSON).Scan(&msg.CreatedAt)
 }
 
 // GetMessages retrieves messages for a conversation
@@ -210,8 +198,8 @@ func (r *conversationRepository) GetMessages(ctx context.Context, conversationID
 		params.Direction = "next"
 	}
 
-	whereClauses := []string{"conversation_id = ?"}
-	args := []interface{}{conversationID.String()}
+	whereClauses := []string{"conversation_id = $1"}
+	args := []interface{}{conversationID}
 
 	if params.Cursor != "" {
 		cursorID, err := uuid.Parse(params.Cursor)
@@ -220,11 +208,11 @@ func (r *conversationRepository) GetMessages(ctx context.Context, conversationID
 		}
 
 		if params.Direction == "prev" {
-			whereClauses = append(whereClauses, "id < ?")
+			whereClauses = append(whereClauses, "created_at < (SELECT created_at FROM messages WHERE id = $2)")
 		} else {
-			whereClauses = append(whereClauses, "id > ?")
+			whereClauses = append(whereClauses, "created_at > (SELECT created_at FROM messages WHERE id = $2)")
 		}
-		args = append(args, cursorID.String())
+		args = append(args, cursorID)
 	}
 
 	whereSQL := "WHERE " + whereClauses[0]
@@ -244,8 +232,8 @@ func (r *conversationRepository) GetMessages(ctx context.Context, conversationID
 		FROM messages
 		%s
 		ORDER BY created_at %s
-		LIMIT ?
-	`, whereSQL, order)
+		LIMIT $%d
+	`, whereSQL, order, len(args)+1)
 
 	args = append(args, fetchLimit)
 
@@ -258,15 +246,15 @@ func (r *conversationRepository) GetMessages(ctx context.Context, conversationID
 	var messages []*models.Message
 	for rows.Next() {
 		var msg models.Message
-		var rawMessageJSON string
+		var rawMessageJSON []byte
 
 		err := rows.Scan(&msg.ID, &msg.ConversationID, &msg.Role, &msg.Content, &msg.ToolCallID, &rawMessageJSON, &msg.CreatedAt)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		// Unmarshal raw_message from JSON string
-		if err := json.Unmarshal([]byte(rawMessageJSON), &msg.RawMessage); err != nil {
+		// Unmarshal raw_message from JSONB
+		if err := json.Unmarshal(rawMessageJSON, &msg.RawMessage); err != nil {
 			return nil, nil, fmt.Errorf("failed to unmarshal raw_message: %w", err)
 		}
 
