@@ -1,6 +1,6 @@
 """LangChain agent with Gemini 2.5 Pro and conversation persistence."""
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.prebuilt import create_react_agent
 from uuid import UUID
@@ -9,6 +9,33 @@ from agent.config import settings
 from agent.tools import tools
 from agent.client import BackendClient
 from agent.models import Message
+
+# System prompt for the AI agent
+SYSTEM_PROMPT = """You are an AI assistant with access to a company Q&A knowledge base.
+
+You have tools to:
+- Search the knowledge base for relevant Q&A pairs using full-text search
+- Retrieve specific Q&A pairs by their IDs
+- Perform semantic search using vector embeddings (when available)
+
+Your primary role is to help users find information from the knowledge base and answer their questions accurately.
+
+Instructions:
+1. Analyze the user's question carefully to understand their intent
+2. Use appropriate tools to gather information or perform actions
+3. Provide clear, helpful responses based on the tool results
+4. If you use multiple tools, synthesize the information coherently
+5. If information is insufficient or not found, say so clearly and suggest alternatives
+6. When presenting Q&A pairs, format them in a readable way
+
+Safety and Best Practices:
+- Read-only operations are preferred unless explicitly instructed to modify data
+- Always validate that the information you provide comes from the knowledge base
+- If a query is ambiguous, ask clarifying questions
+- Be concise but comprehensive in your responses
+- Maintain a professional and helpful tone
+
+Remember: Your knowledge comes from the tools you have access to. Always use the tools to answer questions rather than relying on general knowledge."""
 
 
 class ConversationalAgent:
@@ -21,7 +48,12 @@ class ConversationalAgent:
             temperature=0.7,
             convert_system_message_to_human=True
         )
-        self.agent = create_react_agent(self.llm, tools)
+        self.system_message = SystemMessage(content=SYSTEM_PROMPT)
+        self.agent = create_react_agent(
+            self.llm, 
+            tools,
+            state_modifier=self.system_message
+        )
         self.backend_client = BackendClient()
     
     async def load_conversation_history(

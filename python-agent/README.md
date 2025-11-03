@@ -24,11 +24,43 @@ The AI agent automatically decides which tools to use based on user queries.
 
 ## Prerequisites
 
-- Python 3.11+
-- Go backend running on `http://localhost:8080`
-- Google Gemini API key
+- **For Docker Deployment**: Docker and Docker Compose
+- **For Local Development**: Python 3.11+ and Go backend running
+- **Required**: Google Gemini API key
 
-## Installation
+## Quick Start (Docker - Recommended)
+
+The easiest way to run the entire stack including the Python agent:
+
+1. **Set your Gemini API key** in the root `.env` file:
+   ```bash
+   # In the project root directory
+   echo "GEMINI_API_KEY=your_actual_api_key_here" >> .env
+   ```
+
+2. **Start all services** (Postgres, Go backend, Python agent):
+   ```bash
+   docker-compose up -d
+   ```
+
+3. **Access the services**:
+   - Python Agent API: http://localhost:8000
+   - Go Backend API: http://localhost:8080
+   - API Docs: http://localhost:8000/docs
+
+4. **View logs**:
+   ```bash
+   docker-compose logs -f python-agent
+   ```
+
+5. **Stop services**:
+   ```bash
+   docker-compose down
+   ```
+
+## Local Development Setup
+
+For local development without Docker:
 
 1. **Navigate to the python-agent directory**:
    ```bash
@@ -54,7 +86,20 @@ The AI agent automatically decides which tools to use based on user queries.
 
 ## Configuration
 
-Edit `.env` file with your settings:
+### Docker Deployment
+
+Environment variables are set in `docker-compose.yml`. Only set `GEMINI_API_KEY` in root `.env`:
+
+```env
+# Project root .env file
+GEMINI_API_KEY=your_actual_api_key_here
+```
+
+The Python agent automatically connects to the backend via Docker networking at `http://backend:8080`.
+
+### Local Development
+
+Edit `python-agent/.env` file with your settings:
 
 ```env
 # Required
@@ -62,7 +107,7 @@ GEMINI_API_KEY=your_actual_api_key_here
 
 # Optional (defaults shown)
 GEMINI_MODEL=gemini-2.0-flash-exp
-BACKEND_URL=http://localhost:8080
+BACKEND_URL=http://localhost:8080  # For local dev
 USE_PINECONE=false
 API_HOST=0.0.0.0
 API_PORT=8000
@@ -71,7 +116,23 @@ CORS_ORIGINS=["http://localhost:3000"]
 
 ## Usage
 
-### Start the FastAPI Server
+### Docker (Recommended)
+
+```bash
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f python-agent
+
+# Restart just the Python agent
+docker-compose restart python-agent
+
+# Rebuild after code changes
+docker-compose up -d --build python-agent
+```
+
+### Local Development
 
 ```bash
 python main.py
@@ -241,9 +302,21 @@ Currently, `semantic_search_knowledge_base` falls back to full-text search. To e
 
 ## Development
 
-### Run with auto-reload:
+### Run with auto-reload (Local):
 ```bash
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Docker Development:
+```bash
+# Rebuild and restart after code changes
+docker-compose up -d --build python-agent
+
+# View live logs
+docker-compose logs -f python-agent
+
+# Execute commands inside container
+docker-compose exec python-agent python -c "print('Hello')"
 ```
 
 ### Type checking:
@@ -258,15 +331,33 @@ ruff check agent/ api/
 
 ## Troubleshooting
 
-### "Failed to connect to backend"
+### Docker Issues
+
+**"Failed to connect to backend"** (Docker)
+- Check if backend is running: `docker-compose ps`
+- View backend logs: `docker-compose logs backend`
+- Ensure services are on same network: `docker network ls`
+
+**Container won't start**
+- Check logs: `docker-compose logs python-agent`
+- Rebuild image: `docker-compose build python-agent`
+- Check environment variables: `docker-compose config`
+
+**Changes not reflecting**
+- Rebuild the container: `docker-compose up -d --build python-agent`
+- Check you're editing the right files (not inside container)
+
+### Local Development Issues
+
+**"Failed to connect to backend"**
 - Ensure Go backend is running on `http://localhost:8080`
 - Check `BACKEND_URL` in `.env`
 
-### "Invalid API key"
+**"Invalid API key"**
 - Verify your `GEMINI_API_KEY` in `.env`
 - Ensure the API key has proper permissions
 
-### CORS errors
+**CORS errors**
 - Add your frontend URL to `CORS_ORIGINS` in `.env`
 - Format: `["http://localhost:3000", "http://localhost:5173"]`
 

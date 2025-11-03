@@ -56,11 +56,14 @@ services:
       - SERVER_HOST=0.0.0.0
       - SERVER_ENVIRONMENT=development
       
-      # Pinecone Local
-      - PINECONE_API_KEY=pclocal
-      - PINECONE_HOST=http://pinecone-local:5081
+      # Pinecone Configuration
+      # For LOCAL TESTING: Set PINECONE_HOST to use in-memory Pinecone Local
+      # For PRODUCTION: Remove PINECONE_HOST and set real API key to use Pinecone Cloud (persistent)
+      - PINECONE_API_KEY=pclocal              # Use real key for cloud
+      - PINECONE_HOST=http://pinecone-local:5081  # Remove this line for cloud
       - PINECONE_INDEX_NAME=qa-index
       - PINECONE_NAMESPACE=
+      # - PINECONE_ENVIRONMENT=us-west1-gcp   # Uncomment for cloud
       
       # Google Embedding (optional - will use mock if not set)
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
@@ -74,6 +77,32 @@ services:
         condition: service_healthy
       pinecone-local:
         condition: service_healthy
+    restart: unless-stopped
+
+  python-agent:
+    build:
+      context: ./python-agent
+      dockerfile: Dockerfile
+    container_name: smart-discovery-python-agent
+    environment:
+      # Gemini Configuration
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=gemini-2.0-flash-exp
+      
+      # Go Backend Configuration (using Docker service name)
+      - BACKEND_URL=http://backend:8080
+      
+      # Feature Flags
+      - USE_PINECONE=false
+      
+      # API Configuration
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - CORS_ORIGINS=["http://localhost:3000"]
+    ports:
+      - "8000:8000"
+    depends_on:
+      - backend
     restart: unless-stopped
 
 volumes:
