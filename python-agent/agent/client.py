@@ -5,7 +5,8 @@ from uuid import UUID
 from agent.models import (
     Conversation, Message, QAPair,
     SearchQARequest, SearchQAResponse,
-    GetQAByIDsRequest, GetQAByIDsResponse
+    GetQAByIDsRequest, GetQAByIDsResponse,
+    SemanticSearchRequest, SemanticSearchResponse
 )
 from agent.config import settings
 
@@ -97,23 +98,18 @@ class BackendClient:
         self, 
         query: str, 
         top_k: int = 5
-    ) -> SearchQAResponse:
+    ) -> SemanticSearchResponse:
         """
-        Pinecone semantic search stub.
-        TODO: Implement when Pinecone is configured.
-        Currently falls back to full-text search.
+        Semantic search using Pinecone vector embeddings.
+        Returns results with similarity scores.
         """
-        if not settings.use_pinecone:
-            # Fallback to full-text search
-            return await self.search_qa(query, top_k)
-        
-        # TODO: Call Pinecone-enabled endpoint when available
-        # This would be something like:
-        # response = await self.client.post(
-        #     "/tools/semantic-search-qa",
-        #     json={"query": query, "top_k": top_k}
-        # )
-        raise NotImplementedError("Pinecone integration pending")
+        request = SemanticSearchRequest(query=query, top_k=top_k)
+        response = await self.client.post(
+            "/tools/semantic-search-qa",
+            json=request.model_dump()
+        )
+        response.raise_for_status()
+        return SemanticSearchResponse(**response.json())
     
     async def close(self):
         """Close the HTTP client."""

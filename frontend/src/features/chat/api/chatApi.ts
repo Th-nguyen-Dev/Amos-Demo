@@ -75,11 +75,29 @@ export const chatApi = createApi({
   }),
 })
 
+// Streaming event types from Python agent
+export interface StreamEvent {
+  type: 'content' | 'tool_call_start' | 'tool_call_end' | 'error'
+  data: {
+    // For content
+    content?: string
+    // For tool_call_start
+    id?: string
+    name?: string
+    args?: Record<string, unknown>
+    // For tool_call_end
+    status?: 'success' | 'error'
+    output_preview?: string
+    // For error
+    message?: string
+  }
+}
+
 // Hook for sending messages with streaming (using fetch directly for streaming)
 export async function* sendMessageStreaming(
   conversationId: string,
   message: string
-): AsyncGenerator<string, void, unknown> {
+): AsyncGenerator<StreamEvent, void, unknown> {
   const response = await fetch(`${PYTHON_AGENT_URL}/chat/conversations/${conversationId}/messages`, {
     method: 'POST',
     headers: {
@@ -99,12 +117,28 @@ export async function* sendMessageStreaming(
     throw new Error('No response body')
   }
 
+  let buffer = ''
+
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
 
-    const chunk = decoder.decode(value, { stream: true })
-    yield chunk
+    buffer += decoder.decode(value, { stream: true })
+    
+    // Process complete lines (newline-delimited JSON)
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || '' // Keep incomplete line in buffer
+    
+    for (const line of lines) {
+      if (line.trim()) {
+        try {
+          const event = JSON.parse(line) as StreamEvent
+          yield event
+        } catch (e) {
+          console.error('Failed to parse event:', line, e)
+        }
+      }
+    }
   }
 }
 

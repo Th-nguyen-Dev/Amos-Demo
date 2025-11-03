@@ -189,11 +189,13 @@ func (r *qaRepository) List(ctx context.Context, params models.CursorParams) ([]
 
 	pagination := &models.CursorPagination{}
 
+	// HasPrev should be set if we have a cursor, regardless of whether we have results
+	pagination.HasPrev = params.Cursor != ""
+
 	if len(qaPairs) > 0 {
 		pagination.NextCursor = qaPairs[len(qaPairs)-1].ID.String()
 		pagination.PrevCursor = qaPairs[0].ID.String()
 		pagination.HasNext = hasMore
-		pagination.HasPrev = params.Cursor != ""
 	}
 
 	return qaPairs, pagination, nil

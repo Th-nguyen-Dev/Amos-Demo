@@ -14,9 +14,10 @@ async def search_knowledge_base(
     limit: Annotated[int, "Number of results to return (1-10)"] = 5
 ) -> str:
     """
-    🔍 PRIMARY TOOL: Search the company knowledge base for relevant Q&A pairs using full-text search.
+    🔍 KEYWORD SEARCH: Search the company knowledge base using full-text keyword matching.
     
-    ⚠️ USE THIS TOOL FIRST for ANY user question before responding!
+    Use this as a fallback if semantic_search_knowledge_base doesn't find relevant results.
+    Good for exact keyword matches and specific technical terms.
     
     This searches through all available Q&A pairs and returns the most relevant matches.
     If you don't find what you need, try different keywords or search terms.
@@ -84,29 +85,31 @@ async def semantic_search_knowledge_base(
     top_k: Annotated[int, "Number of semantically similar results (1-20)"] = 5
 ) -> str:
     """
-    Search the knowledge base using semantic similarity (Pinecone vector search).
-    Use this for finding conceptually related content, even if keywords don't match exactly.
+    🎯 SEMANTIC SEARCH: Search the knowledge base using AI-powered semantic similarity (Pinecone vector search).
     
-    NOTE: Currently falls back to full-text search until Pinecone is configured.
+    Use this for finding conceptually related content, even if keywords don't match exactly.
+    This is more powerful than text search for understanding meaning and context.
+    
+    Returns: Matching Q&A pairs with similarity scores (0.0-1.0, higher is more similar).
     """
     try:
         response = await backend_client.semantic_search_qa(query, top_k)
         
         if response.count == 0:
-            return "No semantically similar information found."
+            return "No semantically similar information found in the knowledge base."
         
         results = []
-        for i, qa in enumerate(response.qa_pairs, 1):
+        for i, match in enumerate(response.results, 1):
+            # Format with score as percentage for clarity
+            similarity_pct = match.score * 100
             results.append(
-                f"Result {i}:\n"
-                f"Question: {qa.question}\n"
-                f"Answer: {qa.answer}"
+                f"Result {i} (Similarity: {similarity_pct:.1f}%):\n"
+                f"Question: {match.qa_pair.question}\n"
+                f"Answer: {match.qa_pair.answer}\n"
+                f"ID: {match.qa_pair.id}"
             )
         
         return "\n\n".join(results)
-    except NotImplementedError:
-        # Fallback to regular search
-        return await search_knowledge_base(query, top_k)
     except Exception as e:
         return f"Error in semantic search: {str(e)}"
 
@@ -143,9 +146,9 @@ async def list_knowledge_base_topics() -> str:
 # Complete tool list - Agent will choose which tools to use based on context
 # ORDER MATTERS: Most important tools first
 tools = [
-    search_knowledge_base,          # Primary tool - use this first!
+    semantic_search_knowledge_base, # Primary tool - AI-powered semantic search (use this first!)
+    search_knowledge_base,          # Fallback - keyword-based search
     list_knowledge_base_topics,     # Helper to see what's available
-    semantic_search_knowledge_base, # Alternative search method
     get_qa_by_ids,                  # For retrieving specific items
 ]
 

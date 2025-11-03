@@ -200,6 +200,26 @@ func main() {
 			c.JSON(http.StatusOK, models.GetQAByIDsResponse{QAPairs: result})
 		})
 
+		tools.POST("/semantic-search-qa", func(c *gin.Context) {
+			var req models.SemanticSearchRequest
+			if err := c.ShouldBindJSON(&req); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			// Use semantic search service
+			matches, err := qaService.SearchSimilarByText(c.Request.Context(), req.Query, req.TopK)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.JSON(http.StatusOK, models.SemanticSearchResponse{
+				Results: matches,
+				Count:   len(matches),
+			})
+		})
+
 		tools.POST("/save-message", func(c *gin.Context) {
 			var req models.SaveMessageRequest
 			if err := c.ShouldBindJSON(&req); err != nil {

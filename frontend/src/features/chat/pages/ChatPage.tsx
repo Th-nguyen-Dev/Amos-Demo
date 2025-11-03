@@ -96,39 +96,35 @@ export function ChatPage() {
 
     try {
       let fullText = ''
-      let cleanText = '' // Text without tool markers
       
       // Stream the response
-      for await (const chunk of sendMessageStreaming(selectedConversationId, message)) {
-        fullText += chunk
-        
-        // Detect tool start: 🔧 **Tool: {name}**
-        const toolStartMatch = fullText.match(/🔧 \*\*Tool: (.+?)\*\*/)
-        if (toolStartMatch && !streamingToolCalls.some(tc => tc.name === toolStartMatch[1])) {
-          const toolName = toolStartMatch[1]
-          setStreamingToolCalls(prev => [...prev, { name: toolName, status: 'loading' }])
-        }
-        
-        // Detect tool complete: ✅ Done
-        if (chunk.includes('✅ Done') || chunk.includes('❌ Done')) {
-          setStreamingToolCalls(prev => 
-            prev.map((tc, idx) => 
-              idx === prev.length - 1 ? { ...tc, status: 'complete' } : tc
+      for await (const event of sendMessageStreaming(selectedConversationId, message)) {
+        if (event.type === 'content') {
+          // Text content from AI
+          fullText += event.data.content || ''
+          setStreamingMessage(fullText)
+        } 
+        else if (event.type === 'tool_call_start') {
+          // Tool execution started
+          setStreamingToolCalls(prev => [...prev, {
+            name: event.data.name || 'unknown',
+            status: 'loading'
+          }])
+        } 
+        else if (event.type === 'tool_call_end') {
+          // Tool execution completed
+          setStreamingToolCalls(prev =>
+            prev.map((tc, idx) =>
+              idx === prev.length - 1
+                ? { ...tc, status: event.data.status === 'success' ? 'complete' : 'complete' }
+                : tc
             )
           )
         }
-        
-        // Filter out tool markers from display
-        cleanText = fullText
-          .replace(/🔧 \*\*Tool: .+?\*\*/g, '')
-          .replace(/📋 \*\*Args:\*\* .+?\n/g, '')
-          .replace(/⏳ Executing\.\.\.\n/g, '')
-          .replace(/✅ Done\n\n/g, '')
-          .replace(/❌ Done\n\n/g, '')
-          .replace(/💡 Trying alternative approach\.\.\.\n\n/g, '')
-          .trim()
-        
-        setStreamingMessage(cleanText)
+        else if (event.type === 'error') {
+          console.error('Stream error:', event.data.message)
+          toast.error(event.data.message || 'An error occurred')
+        }
       }
 
       // After streaming is complete, clear streaming state and refetch messages

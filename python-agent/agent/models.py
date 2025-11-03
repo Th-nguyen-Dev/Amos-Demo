@@ -88,3 +88,27 @@ class GetQAByIDsResponse(BaseModel):
     
     qa_pairs: list[QAPair]
 
+
+class SimilarityMatch(BaseModel):
+    """QA pair with similarity score."""
+    model_config = ConfigDict(strict=False)
+    
+    qa_pair: QAPair
+    score: float
+
+
+class SemanticSearchRequest(BaseModel):
+    """Semantic search request."""
+    model_config = ConfigDict(strict=True)
+    
+    query: str = Field(..., min_length=1, max_length=500)
+    top_k: int = Field(default=5, ge=1, le=20)
+
+
+class SemanticSearchResponse(BaseModel):
+    """Semantic search response with scores."""
+    model_config = ConfigDict(strict=True)
+    
+    results: list[SimilarityMatch]
+    count: int
+

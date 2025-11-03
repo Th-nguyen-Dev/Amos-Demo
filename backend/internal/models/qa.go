@@ -108,3 +108,15 @@ type SearchQAResponse struct {
 	QAPairs []QAPair `json:"qa_pairs"`
 	Count   int      `json:"count"`
 }
+
+// SemanticSearchRequest represents a semantic search request using Pinecone
+type SemanticSearchRequest struct {
+	Query string `json:"query" validate:"required,min=1,max=500"`
+	TopK  int    `json:"top_k" validate:"required,min=1,max=20"`
+}
+
+// SemanticSearchResponse represents semantic search results with scores
+type SemanticSearchResponse struct {
+	Results []SimilarityMatch `json:"results"`
+	Count   int               `json:"count"`
+}

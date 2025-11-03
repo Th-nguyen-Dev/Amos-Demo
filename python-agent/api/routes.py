@@ -26,13 +26,27 @@ async def create_conversation(request: CreateConversationRequest):
 
 @router.post("/conversations/{conversation_id}/messages")
 async def send_message(conversation_id: UUID, request: ChatRequest):
-    """Send a message and stream the agent's response."""
+    """Send a message and stream the agent's response as JSON events."""
+    import json
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
     try:
         async def generate():
-            async for chunk in agent.chat(conversation_id, request.message):
-                yield chunk
+            try:
+                async for event in agent.chat(conversation_id, request.message):
+                    # Stream as newline-delimited JSON
+                    yield f"{event}\n"
+            except Exception as e:
+                logger.error(f"Error in chat stream: {e}")
+                error_event = json.dumps({
+                    "type": "error",
+                    "data": {"message": str(e)}
+                })
+                yield f"{error_event}\n"
         
-        return StreamingResponse(generate(), media_type="text/plain")
+        return StreamingResponse(generate(), media_type="application/x-ndjson")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

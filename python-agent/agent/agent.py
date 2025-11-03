@@ -23,16 +23,18 @@ SYSTEM_PROMPT = """You are a specialized AI assistant for a company's Q&A knowle
 6. **Be thorough** - Don't give up after one search, try variations if needed
 
 🔧 AVAILABLE TOOLS:
-- search_knowledge_base: Full-text search for Q&A pairs (USE THIS FIRST!)
-- semantic_search_knowledge_base: Conceptual/semantic search
+- semantic_search_knowledge_base: AI-powered semantic search - finds conceptually related content (USE THIS FIRST!)
+- search_knowledge_base: Full-text keyword search for Q&A pairs (fallback if semantic doesn't work)
 - get_qa_by_ids: Get specific Q&A pairs by ID
+- list_knowledge_base_topics: List all available topics in the knowledge base
 
 📋 YOUR WORKFLOW FOR EVERY QUESTION:
-1. **STEP 1**: Call search_knowledge_base with relevant keywords
-2. **STEP 2**: If results are not relevant, try different search terms
-3. **STEP 3**: Review all search results carefully
-4. **STEP 4**: Synthesize the information from the knowledge base
-5. **STEP 5**: Format response clearly with source attribution
+1. **STEP 1**: Call semantic_search_knowledge_base with the user's question (most powerful!)
+2. **STEP 2**: If results are not relevant (low similarity scores), try search_knowledge_base with keywords
+3. **STEP 3**: Try different search terms or variations if needed
+4. **STEP 4**: Review all search results carefully (semantic search shows similarity scores)
+5. **STEP 5**: Synthesize the information from the knowledge base
+6. **STEP 6**: Format response clearly with source attribution
 
 ❌ WHAT NOT TO DO:
 - DO NOT answer questions without searching first
@@ -42,8 +44,8 @@ SYSTEM_PROMPT = """You are a specialized AI assistant for a company's Q&A knowle
 
 ✅ EXAMPLE GOOD BEHAVIOR:
 User: "What is Docker?"
-You: *calls search_knowledge_base("Docker")*
-You: *reviews results and answers based ONLY on what was found*
+You: *calls semantic_search_knowledge_base("What is Docker?")*
+You: *reviews results with similarity scores and answers based ONLY on what was found*
 
 ❌ EXAMPLE BAD BEHAVIOR:
 User: "What is Docker?"
@@ -195,14 +197,18 @@ class ConversationalAgent:
             if kind == "on_chat_model_stream":
                 chunk = event["data"]["chunk"]
                 if hasattr(chunk, "content") and chunk.content:
-                    # Check if we're past tool execution (final response)
-                    if in_final_response or (current_tool_calls and tool_call_assistant_saved):
+                    # Always accumulate content for saving
+                    final_response += chunk.content
+                    
+                    # Check if we're past tool execution
+                    if current_tool_calls and tool_call_assistant_saved:
                         in_final_response = True
-                        final_response += chunk.content
-                        yield chunk.content
-                    else:
-                        # This might be pre-tool reasoning, just stream it
-                        yield chunk.content
+                    
+                    # Stream as structured JSON
+                    yield json.dumps({
+                        "type": "content",
+                        "data": chunk.content
+                    })
             
             elif kind == "on_tool_start":
                 tool_name = event["name"]
@@ -236,10 +242,15 @@ class ConversationalAgent:
                     )
                     tool_call_assistant_saved = True
                 
-                # Stream user-friendly display
-                yield f"\n\n🔧 **Tool: {tool_name}**\n"
-                yield f"📋 **Args:** {json.dumps(tool_input)}\n"
-                yield f"⏳ Executing...\n"
+                # Stream structured tool call event
+                yield json.dumps({
+                    "type": "tool_call_start",
+                    "data": {
+                        "id": tool_call_id,
+                        "name": tool_name,
+                        "args": tool_input
+                    }
+                })
             
             elif kind == "on_tool_end":
                 tool_name = event["name"]
@@ -253,6 +264,9 @@ class ConversationalAgent:
                         break
                 
                 # Save tool result message immediately
+                # IMPORTANT: tool_output is already a formatted string from the tool function
+                # For semantic search, this contains only: question, answer, score, and ID
+                # NO vector/embedding data is stored - only human-readable results
                 if matching_tool_call:
                     tool_result_msg = {
                         "role": "tool",
@@ -272,13 +286,20 @@ class ConversationalAgent:
                 is_success = not any(phrase in str(tool_output).lower() 
                                    for phrase in ["no relevant", "not found", "error"])
                 
-                status_icon = "✅" if is_success else "❌"
+                # Stream structured tool result event
+                output_preview = str(tool_output)[:300]
+                if len(str(tool_output)) > 300:
+                    output_preview += "... (truncated)"
                 
-                # Stream user-friendly display
-                yield f"{status_icon} Done\n\n"
-                
-                if not is_success:
-                    yield f"💡 Trying alternative approach...\n\n"
+                yield json.dumps({
+                    "type": "tool_call_end",
+                    "data": {
+                        "id": matching_tool_call["id"] if matching_tool_call else None,
+                        "name": tool_name,
+                        "status": "success" if is_success else "error",
+                        "output_preview": output_preview
+                    }
+                })
         
         # Save final assistant message with the answer (separate from tool calls)
         if final_response:

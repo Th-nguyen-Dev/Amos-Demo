@@ -131,11 +131,13 @@ func (r *conversationRepository) ListConversations(ctx context.Context, params m
 
 	pagination := &models.CursorPagination{}
 
+	// HasPrev should be set if we have a cursor, regardless of whether we have results
+	pagination.HasPrev = params.Cursor != ""
+
 	if len(conversations) > 0 {
 		pagination.NextCursor = conversations[len(conversations)-1].ID.String()
 		pagination.PrevCursor = conversations[0].ID.String()
 		pagination.HasNext = hasMore
-		pagination.HasPrev = params.Cursor != ""
 	}
 
 	return conversations, pagination, nil
@@ -274,11 +276,13 @@ func (r *conversationRepository) GetMessages(ctx context.Context, conversationID
 
 	pagination := &models.CursorPagination{}
 
+	// HasPrev should be set if we have a cursor, regardless of whether we have results
+	pagination.HasPrev = params.Cursor != ""
+
 	if len(messages) > 0 {
 		pagination.NextCursor = messages[len(messages)-1].ID.String()
 		pagination.PrevCursor = messages[0].ID.String()
 		pagination.HasNext = hasMore
-		pagination.HasPrev = params.Cursor != ""
 	}
 
 	return messages, pagination, nil
