@@ -26,6 +26,7 @@ export function ChatPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const selectedConversationRef = useRef<HTMLDivElement>(null)
 
   // Fetch conversations
   const { data: conversationsData, isLoading: conversationsLoading } = useListConversationsQuery()
@@ -45,6 +46,13 @@ export function ChatPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages.length, streamingMessage, pendingUserMessage])
+
+  // Scroll selected conversation into view
+  useEffect(() => {
+    if (selectedConversationId) {
+      selectedConversationRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, [selectedConversationId])
 
   const handleNewConversation = async () => {
     try {
@@ -175,6 +183,7 @@ export function ChatPage() {
                 {conversations.map((conv) => (
                   <div
                     key={conv.id}
+                    ref={selectedConversationId === conv.id ? selectedConversationRef : null}
                     className={`group relative flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
                       selectedConversationId === conv.id
                         ? 'bg-primary text-primary-foreground'

@@ -59,8 +59,11 @@ func (c *GoogleEmbeddingClient) GenerateEmbedding(ctx context.Context, text stri
 		genai.NewContentFromText(text, genai.RoleUser),
 	}
 
-	// Call EmbedContent API
-	result, err := c.client.Models.EmbedContent(ctx, c.model, contents, nil)
+	// Call EmbedContent API with 768 dimensions
+	outputDim := int32(768)
+	result, err := c.client.Models.EmbedContent(ctx, c.model, contents, &genai.EmbedContentConfig{
+		OutputDimensionality: &outputDim,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("embedding request failed: %w", err)
 	}
@@ -90,8 +93,11 @@ func (c *GoogleEmbeddingClient) GenerateBatchEmbeddings(ctx context.Context, tex
 		contents[i] = genai.NewContentFromText(text, genai.RoleUser)
 	}
 
-	// Call EmbedContent API with all contents at once
-	result, err := c.client.Models.EmbedContent(ctx, c.model, contents, nil)
+	// Call EmbedContent API with all contents at once, using 768 dimensions
+	outputDim := int32(768)
+	result, err := c.client.Models.EmbedContent(ctx, c.model, contents, &genai.EmbedContentConfig{
+		OutputDimensionality: &outputDim,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("batch embedding request failed: %w", err)
 	}

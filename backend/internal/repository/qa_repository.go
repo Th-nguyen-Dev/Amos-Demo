@@ -119,7 +119,7 @@ func (r *qaRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-// List retrieves Q&A pairs with cursor pagination
+// List retrieves Q&A pairs with forward-only cursor pagination
 func (r *qaRepository) List(ctx context.Context, params models.CursorParams) ([]*models.QAPair, *models.CursorPagination, error) {
 	if params.Limit < 1 {
 		params.Limit = 10
@@ -127,48 +127,29 @@ func (r *qaRepository) List(ctx context.Context, params models.CursorParams) ([]
 	if params.Limit > 100 {
 		params.Limit = 100
 	}
-	if params.Direction == "" {
-		params.Direction = "next"
-	}
 
-	whereClauses := []string{}
+	// Build WHERE clause for cursor (always forward pagination)
+	whereSQL := ""
 	args := []interface{}{}
-
 	if params.Cursor != "" {
 		cursorID, err := uuid.Parse(params.Cursor)
 		if err != nil {
 			return nil, nil, fmt.Errorf("invalid cursor: %w", err)
 		}
-
-		if params.Direction == "prev" {
-			whereClauses = append(whereClauses, "id > $1")
-		} else {
-			whereClauses = append(whereClauses, "id < $1")
-		}
+		whereSQL = "WHERE id < $1"
 		args = append(args, cursorID)
 	}
 
-	whereSQL := ""
-	if len(whereClauses) > 0 {
-		whereSQL = "WHERE " + whereClauses[0]
-	}
-
-	// Determine sort order
-	// UUIDv7 is time-ordered, so DESC = newest first, ASC = oldest first
-	order := "DESC"
-	if params.Cursor != "" && params.Direction == "prev" {
-		order = "ASC"
-	}
-
+	// Always order by ID descending (newest first) for forward pagination
 	fetchLimit := params.Limit + 1
 
 	query := fmt.Sprintf(`
 		SELECT id, question, answer, created_at, updated_at
 		FROM qa_pairs
 		%s
-		ORDER BY id %s
+		ORDER BY id DESC
 		LIMIT $%d
-	`, whereSQL, order, len(args)+1)
+	`, whereSQL, len(args)+1)
 
 	args = append(args, fetchLimit)
 
@@ -178,27 +159,19 @@ func (r *qaRepository) List(ctx context.Context, params models.CursorParams) ([]
 		return nil, nil, err
 	}
 
+	// Check if there are more results
 	hasMore := len(qaPairs) > params.Limit
 	if hasMore {
 		qaPairs = qaPairs[:params.Limit]
 	}
 
-	// Only reverse if we actually used prev direction with a cursor
-	if params.Cursor != "" && params.Direction == "prev" {
-		for i, j := 0, len(qaPairs)-1; i < j; i, j = i+1, j-1 {
-			qaPairs[i], qaPairs[j] = qaPairs[j], qaPairs[i]
-		}
-	}
-
+	// Build pagination metadata
 	pagination := &models.CursorPagination{}
-
-	// HasPrev should be set if we have a cursor, regardless of whether we have results
-	pagination.HasPrev = params.Cursor != ""
-
 	if len(qaPairs) > 0 {
 		pagination.NextCursor = qaPairs[len(qaPairs)-1].ID.String()
 		pagination.PrevCursor = qaPairs[0].ID.String()
 		pagination.HasNext = hasMore
+		pagination.HasPrev = params.Cursor != "" // If we have a cursor, we can go back
 	}
 
 	return qaPairs, pagination, nil

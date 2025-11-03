@@ -1,25 +1,200 @@
-# Smart Company Discovery - Frontend
+# Frontend - Smart Company Discovery Assistant
 
-A modern React + TypeScript frontend application for the Smart Company Discovery Assistant.
+Modern React + TypeScript frontend application with a beautiful UI for managing Q&A knowledge base and chatting with an AI assistant. Built with Vite, Tailwind CSS, and Redux Toolkit.
 
-## 🚀 Tech Stack
+## 📋 Table of Contents
 
-- **Framework**: React 18 + Vite
-- **Language**: TypeScript
-- **UI Library**: ShadCN UI (Radix UI primitives + Tailwind CSS)
-- **State Management**: Redux Toolkit + RTK Query
-- **Routing**: React Router v6
-- **Styling**: Tailwind CSS
-- **Notifications**: Sonner (toast notifications)
-- **Icons**: Lucide React
+- [Overview](#overview)
+- [Technology Stack](#technology-stack)
+- [Architecture](#architecture)
+- [Project Structure](#project-structure)
+- [Setup Instructions](#setup-instructions)
+- [Environment Configuration](#environment-configuration)
+- [Features](#features)
+- [Component Architecture](#component-architecture)
+- [State Management](#state-management)
+- [API Integration](#api-integration)
+- [Styling Approach](#styling-approach)
+- [Development Workflows](#development-workflows)
+- [Build and Deployment](#build-and-deployment)
+- [Troubleshooting](#troubleshooting)
 
-## 📋 Prerequisites
+## Overview
 
-- Node.js 18+ 
-- npm or yarn
-- Backend Go API running on `http://localhost:8080`
+The frontend provides an intuitive, modern web interface for the Smart Company Discovery Assistant. Users can manage the Q&A knowledge base and interact with an AI-powered chat assistant through a responsive, polished UI.
 
-## 🛠️ Installation
+### Key Features
+
+✅ **Q&A Management Interface** - Full CRUD operations with search and pagination  
+✅ **AI Chat Interface** - Conversational AI with streaming responses  
+✅ **Real-time Updates** - Optimistic updates and automatic cache invalidation  
+✅ **Modern UI Components** - ShadCN UI with Radix primitives  
+✅ **Type Safety** - Full TypeScript coverage  
+✅ **Responsive Design** - Works on desktop, tablet, and mobile  
+✅ **Toast Notifications** - User-friendly feedback for all actions  
+✅ **Loading States** - Skeleton loaders and spinners
+
+## Technology Stack
+
+### Core Framework
+- **React 19.1.1** - Latest React with concurrent features
+- **TypeScript 5.9.3** - Type-safe JavaScript
+- **Vite 7.1.7** - Lightning-fast build tool and dev server
+
+### UI & Styling
+- **Tailwind CSS 4.1.16** - Utility-first CSS framework
+- **ShadCN UI** - High-quality, accessible components built on Radix UI
+- **Radix UI** - Unstyled, accessible component primitives
+- **Lucide React** - Beautiful icon library
+- **Sonner** - Elegant toast notifications
+
+### State Management
+- **Redux Toolkit 2.9.2** - Modern Redux with less boilerplate
+- **RTK Query** - Powerful data fetching and caching
+- **React Redux 9.2.0** - Official React bindings
+
+### Routing & Navigation
+- **React Router 7.9.5** - Declarative routing for React
+
+### Development Tools
+- **ESLint 9.36.0** - Code linting
+- **TypeScript ESLint** - TypeScript-specific linting rules
+- **Vite Plugin React** - Fast refresh and JSX transform
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                         UI Layer                            │
+│  • Pages           • Components        • Layouts            │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+┌───────────────────────────┴─────────────────────────────────┐
+│                     Feature Modules                          │
+│  ┌─────────────────┐              ┌─────────────────┐      │
+│  │  Q&A Feature    │              │  Chat Feature   │      │
+│  │  • QATable      │              │  • ChatMessage  │      │
+│  │  • QAForm       │              │  • ChatInput    │      │
+│  │  • QADialogs    │              │  • Streaming    │      │
+│  └─────────────────┘              └─────────────────┘      │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+┌───────────────────────────┴─────────────────────────────────┐
+│                    State Management                          │
+│  • Redux Store    • RTK Query APIs    • Cache Management    │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+┌───────────────────────────┴─────────────────────────────────┐
+│                      API Layer                               │
+│  • qaApi (RTK Query)                                        │
+│  • chatApi (RTK Query + Streaming)                          │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                  ┌─────────┴─────────┐
+                  │                   │
+          ┌───────▼────────┐  ┌──────▼──────────┐
+          │  Backend API   │  │  Python Agent   │
+          │  :8080         │  │  :8000          │
+          └────────────────┘  └─────────────────┘
+```
+
+### Design Patterns
+
+1. **Feature-Based Structure**: Code organized by feature, not technical role
+2. **Atomic Components**: Reusable UI components with single responsibility
+3. **Container/Presenter Pattern**: Smart components handle logic, presenters handle UI
+4. **RTK Query Integration**: Automatic caching, invalidation, and refetching
+5. **Type-First Development**: TypeScript interfaces for all data structures
+
+## Project Structure
+
+```
+frontend/
+├── src/
+│   ├── app/
+│   │   ├── store.ts              # Redux store configuration
+│   │   └── hooks.ts              # Typed Redux hooks
+│   │
+│   ├── features/
+│   │   ├── qa/                   # Q&A Management Feature
+│   │   │   ├── api/
+│   │   │   │   └── qaApi.ts      # RTK Query API slice
+│   │   │   ├── components/
+│   │   │   │   ├── QATable.tsx   # Q&A list table
+│   │   │   │   ├── QAForm.tsx    # Create/edit form
+│   │   │   │   ├── CreateQADialog.tsx
+│   │   │   │   ├── EditQADialog.tsx
+│   │   │   │   └── DeleteQADialog.tsx
+│   │   │   ├── pages/
+│   │   │   │   └── QAManagementPage.tsx
+│   │   │   └── types.ts          # Feature-specific types
+│   │   │
+│   │   └── chat/                 # AI Chat Feature
+│   │       ├── api/
+│   │       │   └── chatApi.ts    # RTK Query + Streaming
+│   │       ├── components/
+│   │       │   ├── ChatMessage.tsx
+│   │       │   ├── ChatInput.tsx
+│   │       │   └── StreamingMessage.tsx
+│   │       ├── pages/
+│   │       │   └── ChatPage.tsx
+│   │       └── types.ts
+│   │
+│   ├── components/               # Shared Components
+│   │   ├── Layout.tsx            # App layout wrapper
+│   │   ├── Navigation.tsx        # Top navigation bar
+│   │   ├── ai/                   # AI-specific components
+│   │   │   ├── message-content.tsx
+│   │   │   └── tool.tsx
+│   │   └── ui/                   # ShadCN UI Components
+│   │       ├── button.tsx
+│   │       ├── card.tsx
+│   │       ├── dialog.tsx
+│   │       ├── input.tsx
+│   │       ├── table.tsx
+│   │       └── ... (other UI primitives)
+│   │
+│   ├── types/                    # Global Types
+│   │   ├── api.ts               # API request/response types
+│   │   └── models.ts            # Domain models
+│   │
+│   ├── lib/
+│   │   └── utils.ts             # Utility functions (cn, etc.)
+│   │
+│   ├── App.tsx                  # Root component
+│   ├── App.css                  # App-level styles
+│   ├── main.tsx                 # Entry point
+│   └── index.css                # Global styles + Tailwind
+│
+├── public/
+│   └── vite.svg                 # Public assets
+│
+├── index.html                   # HTML template
+├── package.json                 # Dependencies
+├── tsconfig.json                # TypeScript config
+├── vite.config.ts              # Vite configuration
+├── tailwind.config.js          # Tailwind configuration
+├── postcss.config.js           # PostCSS configuration
+└── eslint.config.js            # ESLint configuration
+```
+
+### Directory Explanations
+
+- **app/**: Global app configuration (Redux store, hooks)
+- **features/**: Feature modules (Q&A, Chat) with co-located components, API, and types
+- **components/**: Shared components used across features
+- **types/**: Global TypeScript type definitions
+- **lib/**: Utility functions and helpers
+
+## Setup Instructions
+
+### Prerequisites
+
+- **Node.js 18+** (LTS recommended)
+- **npm** or **yarn** or **pnpm**
+- **Backend running** at `http://localhost:8080`
+
+### Installation
 
 ```bash
 # Navigate to frontend directory
@@ -34,263 +209,763 @@ npm run dev
 
 The app will be available at **http://localhost:5173**
 
-## 🌐 Environment Configuration
+### First Time Setup
 
-The app uses environment variables for configuration. The default values work with the local backend:
+1. **Ensure backend is running**:
+   ```bash
+   curl http://localhost:8080/health
+   ```
 
-```env
+2. **Start frontend**:
+   ```bash
+   npm run dev
+   ```
+
+3. **Open browser**:
+   - Navigate to http://localhost:5173
+   - You should see the Q&A Management page
+
+### Development Mode
+
+In development mode, Vite provides:
+- ⚡ Lightning-fast hot module replacement (HMR)
+- 🔥 Instant feedback on code changes
+- 🔍 Detailed error messages
+- 🌐 Automatic proxy to backend API
+
+## Environment Configuration
+
+### Environment Variables
+
+Create a `.env` file in the `frontend/` directory:
+
+```bash
+# Backend API URL
 VITE_API_BASE_URL=http://localhost:8080
+
+# Python Agent URL (for chat)
+VITE_AGENT_URL=http://localhost:8000
 ```
 
-The Vite dev server includes a proxy configuration that forwards `/api/*` requests to the backend.
+**Note**: Vite requires `VITE_` prefix for environment variables to be exposed to the client.
 
-## ✨ Features
+### Vite Proxy Configuration
 
-### Q&A Knowledge Base Management
-- ✅ **List Q&A pairs** with cursor-based pagination
-- ✅ **Search Q&A pairs** with debounced full-text search
-- ✅ **Create new Q&A pairs** via modal dialog
-- ✅ **Edit existing Q&A pairs** with pre-populated forms
-- ✅ **Delete Q&A pairs** with confirmation dialog
-- ✅ **Toast notifications** for all CRUD operations
-- ✅ **Loading states** during API operations
+The Vite dev server is configured to proxy API requests:
+
+```typescript
+// vite.config.ts
+server: {
+  proxy: {
+    '/api': {
+      target: 'http://localhost:8080',
+      changeOrigin: true,
+    },
+  },
+}
+```
+
+This means:
+- Frontend can call `/api/qa-pairs` and it proxies to `http://localhost:8080/api/qa-pairs`
+- Avoids CORS issues in development
+- Simulates production environment
+
+## Features
+
+### Q&A Management
+
+**Location**: `/` (Home page)
+
+**Capabilities**:
+- ✅ **View all Q&A pairs** in a responsive table
+- ✅ **Search** with debounced full-text search
+- ✅ **Pagination** with cursor-based navigation
+- ✅ **Create** new Q&A pairs via dialog modal
+- ✅ **Edit** existing Q&A pairs with pre-filled form
+- ✅ **Delete** with confirmation dialog
+- ✅ **Toast notifications** for success/error feedback
+- ✅ **Loading states** with skeleton loaders
 - ✅ **Error handling** with user-friendly messages
 
+**Features in Detail**:
+
+1. **Search**:
+   - Real-time debounced search (300ms delay)
+   - Searches both questions and answers
+   - Clears pagination cursor on new search
+
+2. **Pagination**:
+   - Cursor-based (efficient for large datasets)
+   - Next/Previous navigation
+   - Shows current page status
+   - Preserves search query across pages
+
+3. **Create Q&A**:
+   - Modal dialog with form
+   - Question and answer fields (required)
+   - Validation feedback
+   - Success toast on creation
+   - Automatic table refresh
+
+4. **Edit Q&A**:
+   - Pre-populated form with existing data
+   - Same validation as create
+   - Optimistic updates
+   - Success toast on update
+
+5. **Delete Q&A**:
+   - Confirmation dialog
+   - Prevents accidental deletion
+   - Success toast on deletion
+   - Automatic table refresh
+
 ### AI Chat Interface
-- ✅ **Ask questions** to the AI assistant
-- ✅ **View AI responses** in a chat-like interface
+
+**Location**: `/chat`
+
+**Capabilities**:
+- ✅ **Ask questions** in natural language
+- ✅ **View AI responses** with streaming
 - ✅ **Message history** displayed chronologically
-- ✅ **Clear conversation** functionality
+- ✅ **Clear conversation** to start fresh
+- ✅ **Tool call visualization** (see what tools AI uses)
 - ✅ **Auto-scroll** to latest messages
-- ✅ **Keyboard shortcuts** (Enter to send, Shift+Enter for new line)
+- ✅ **Keyboard shortcuts** (Enter to send, Shift+Enter for newline)
 - ✅ **Loading indicators** during AI processing
 - ✅ **Error handling** with retry capability
 
-## 📁 Project Structure
+**Chat Flow**:
 
-```
-src/
-├── app/                        # Redux store configuration
-│   ├── store.ts               # Redux store setup
-│   └── hooks.ts               # Typed Redux hooks
-├── features/                   # Feature-based modules
-│   ├── qa/                    # Q&A Management feature
-│   │   ├── api/               # RTK Query API slice
-│   │   ├── components/        # Feature components
-│   │   ├── pages/             # Feature pages
-│   │   └── types.ts           # Feature types
-│   └── chat/                  # Chat feature
-│       ├── api/               # RTK Query API slice
-│       ├── components/        # Feature components
-│       ├── pages/             # Feature pages
-│       └── types.ts           # Feature types
-├── components/                 # Shared components
-│   ├── ui/                    # ShadCN UI components
-│   ├── Layout.tsx             # Main layout wrapper
-│   └── Navigation.tsx         # Navigation bar
-├── lib/                       # Utility functions
-│   └── utils.ts              # cn() for className merging
-├── types/                     # Shared TypeScript types
-│   ├── models.ts             # Domain models
-│   └── api.ts                # API request/response types
-├── App.tsx                    # Root component with routing
-├── main.tsx                   # Application entry point
-└── index.css                  # Global styles + Tailwind
-```
+1. User types question
+2. Message sent to Python AI agent
+3. Agent streams response in real-time
+4. Messages saved to backend
+5. UI updates with streaming content
+6. Tool calls displayed (optional)
 
-## 🎨 Component Architecture
+**Streaming Implementation**:
+- Uses Server-Sent Events (SSE) pattern
+- Newline-delimited JSON (NDJSON) format
+- Real-time token-by-token display
+- Handles disconnections gracefully
 
-### Q&A Management Components
-- **QAManagementPage**: Main page with CRUD operations
-- **QATable**: Displays Q&A pairs in a table
-- **QAForm**: Reusable form for create/edit
-- **CreateQADialog**: Modal for creating new Q&A
-- **EditQADialog**: Modal for editing existing Q&A
-- **DeleteQADialog**: Confirmation dialog for deletion
+## Component Architecture
 
-### Chat Components
-- **ChatPage**: Main chat interface
-- **ChatMessage**: Individual message display
-- **ChatInput**: Input field with submit functionality
+### Atomic Design Principles
 
-### Shared UI Components (ShadCN)
-- Button, Input, Textarea, Label
-- Card, Table, Dialog, Alert
-- Toast notifications (Sonner)
+1. **Atoms** (Basic UI elements):
+   - `Button`, `Input`, `Label`, `Card`
+   - From ShadCN UI library
+   - Highly reusable, no business logic
 
-## 🔄 State Management
+2. **Molecules** (Composite components):
+   - `QAForm`, `ChatInput`, `ChatMessage`
+   - Combine atoms with minimal logic
+   - Feature-specific
 
-### RTK Query API Slices
+3. **Organisms** (Complex components):
+   - `QATable`, `CreateQADialog`, `StreamingMessage`
+   - Contain business logic
+   - Feature-complete sections
 
-**QA API** (`features/qa/api/qaApi.ts`):
-- `listQAPairs` - GET with pagination and search
-- `getQAPair` - GET single Q&A by ID
-- `createQAPair` - POST new Q&A
-- `updateQAPair` - PUT update Q&A
-- `deleteQAPair` - DELETE Q&A
+4. **Pages** (Route-level components):
+   - `QAManagementPage`, `ChatPage`
+   - Compose organisms
+   - Handle routing and layout
 
-**Chat API** (`features/chat/api/chatApi.ts`):
-- `askQuestion` - POST question to AI assistant
+### Key Components
 
-### Automatic Cache Management
-RTK Query handles:
-- Automatic caching and invalidation
-- Optimistic updates
-- Loading and error states
-- Request deduplication
+#### QATable (`features/qa/components/QATable.tsx`)
 
-## 🚦 Development Commands
-
-```bash
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
-
-# Type checking
-npx tsc --noEmit
-
-# Lint (if configured)
-npm run lint
-```
-
-## 🌐 API Integration
-
-### Backend Endpoints
-
-The frontend integrates with these Go backend endpoints:
-
-**Q&A Management**:
-- `GET /api/qa-pairs` - List Q&A pairs
-- `GET /api/qa-pairs/:id` - Get single Q&A
-- `POST /api/qa-pairs` - Create Q&A
-- `PUT /api/qa-pairs/:id` - Update Q&A
-- `DELETE /api/qa-pairs/:id` - Delete Q&A
-
-**Chat**:
-- `POST /api/ask` - Ask question (proxies to Python agent)
-
-### Query Parameters
-
-**Pagination**:
-- `limit` (default: 10) - Number of items per page
-- `cursor` - Cursor for pagination
-- `direction` - `next` or `prev`
-- `search` - Search query string
-
-## 🎯 TypeScript Types
-
-All types match the backend Go models:
+Displays Q&A pairs with actions:
 
 ```typescript
-interface QAPair {
-  id: string              // UUID
-  question: string
-  answer: string
-  created_at: string
-  updated_at: string
-}
-
-interface CursorPagination {
-  next_cursor?: string
-  prev_cursor?: string
-  has_next: boolean
-  has_prev: boolean
+interface QATableProps {
+  data: QAPair[]
+  loading: boolean
+  onEdit: (qa: QAPair) => void
+  onDelete: (qa: QAPair) => void
 }
 ```
 
-## 🎨 Styling
+**Features**:
+- Responsive table layout
+- Action buttons (edit, delete)
+- Loading skeleton
+- Empty state
+
+#### QAForm (`features/qa/components/QAForm.tsx`)
+
+Reusable form for create/edit:
+
+```typescript
+interface QAFormProps {
+  initialData?: QAPair
+  onSubmit: (data: QAFormData) => void
+  loading: boolean
+}
+```
+
+**Features**:
+- Controlled inputs
+- Validation
+- Loading states
+- Error display
+
+#### ChatMessage (`features/chat/components/ChatMessage.tsx`)
+
+Displays a single chat message:
+
+```typescript
+interface ChatMessageProps {
+  message: ChatMessage
+  streaming?: boolean
+}
+```
+
+**Features**:
+- Role-based styling (user vs assistant)
+- Markdown rendering
+- Tool call visualization
+- Timestamp display
+
+#### StreamingMessage (`features/chat/components/StreamingMessage.tsx`)
+
+Handles real-time streaming:
+
+```typescript
+interface StreamingMessageProps {
+  conversationId: string
+  onComplete: () => void
+}
+```
+
+**Features**:
+- SSE connection management
+- Token accumulation
+- Tool call parsing
+- Error handling
+
+## State Management
+
+### Redux Store Configuration
+
+```typescript
+// app/store.ts
+export const store = configureStore({
+  reducer: {
+    [qaApi.reducerPath]: qaApi.reducer,
+    [chatApi.reducerPath]: chatApi.reducer,
+  },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware()
+      .concat(qaApi.middleware, chatApi.middleware),
+})
+```
+
+**State Structure**:
+- RTK Query manages all server state
+- No manual Redux slices needed
+- Automatic cache management
+- Optimistic updates
+
+### RTK Query APIs
+
+#### QA API (`features/qa/api/qaApi.ts`)
+
+```typescript
+export const qaApi = createApi({
+  reducerPath: 'qaApi',
+  baseQuery: fetchBaseQuery({ baseUrl: `${API_BASE_URL}/api` }),
+  tagTypes: ['QAPair'],
+  endpoints: (builder) => ({
+    listQAPairs: builder.query<ListQAResponse, CursorParams>(...),
+    getQAPair: builder.query<QAPair, string>(...),
+    createQAPair: builder.mutation<CreateQAResponse, CreateQARequest>(...),
+    updateQAPair: builder.mutation<UpdateQAResponse, {...}>(...),
+    deleteQAPair: builder.mutation<{ success: boolean }, string>(...),
+  }),
+})
+```
+
+**Auto-generated Hooks**:
+- `useListQAPairsQuery` - List with caching
+- `useGetQAPairQuery` - Single item
+- `useCreateQAPairMutation` - Create with invalidation
+- `useUpdateQAPairMutation` - Update with invalidation
+- `useDeleteQAPairMutation` - Delete with invalidation
+
+**Cache Tags**:
+- `{ type: 'QAPair', id: 'LIST' }` - All Q&A lists
+- `{ type: 'QAPair', id: <uuid> }` - Individual Q&A pair
+
+**Invalidation Strategy**:
+- Create → Invalidates `LIST`
+- Update → Invalidates `LIST` + specific `id`
+- Delete → Invalidates `LIST` + specific `id`
+
+#### Chat API (`features/chat/api/chatApi.ts`)
+
+```typescript
+export const chatApi = createApi({
+  reducerPath: 'chatApi',
+  baseQuery: fetchBaseQuery({ baseUrl: `${AGENT_URL}/chat` }),
+  tagTypes: ['Conversation', 'Message'],
+  endpoints: (builder) => ({
+    createConversation: builder.mutation(...),
+    getMessages: builder.query(...),
+  }),
+})
+```
+
+**Special Handling**:
+- Streaming not handled by RTK Query
+- Uses custom fetch with SSE
+- Messages cached after streaming completes
+
+## API Integration
+
+### Backend API (Go)
+
+**Base URL**: `http://localhost:8080/api`
+
+**Endpoints Used**:
+- `GET /qa-pairs` - List Q&A (with search, pagination)
+- `GET /qa-pairs/:id` - Get single Q&A
+- `POST /qa-pairs` - Create Q&A
+- `PUT /qa-pairs/:id` - Update Q&A
+- `DELETE /qa-pairs/:id` - Delete Q&A
+
+**Request Examples**:
+
+```typescript
+// List Q&A with search
+const { data } = useListQAPairsQuery({ 
+  search: 'docker', 
+  limit: 20 
+})
+
+// Create Q&A
+const [createQA] = useCreateQAPairMutation()
+await createQA({ 
+  question: '...', 
+  answer: '...' 
+})
+```
+
+### Python Agent API
+
+**Base URL**: `http://localhost:8000/chat`
+
+**Endpoints Used**:
+- `POST /conversations` - Create conversation
+- `POST /conversations/:id/messages` - Send message (streaming)
+- `GET /conversations/:id/messages` - Get message history
+
+**Streaming Implementation**:
+
+```typescript
+const response = await fetch(`${url}/messages`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ message: userMessage }),
+})
+
+const reader = response.body?.getReader()
+const decoder = new TextDecoder()
+
+while (true) {
+  const { done, value } = await reader.read()
+  if (done) break
+  
+  const text = decoder.decode(value)
+  const lines = text.split('\n')
+  
+  for (const line of lines) {
+    if (line) {
+      const event = JSON.parse(line)
+      // Handle event...
+    }
+  }
+}
+```
+
+## Styling Approach
 
 ### Tailwind CSS
-- Custom color scheme matching ShadCN defaults
-- Responsive design utilities
-- CSS variables for theming
-- Dark mode support (configured but not activated)
 
-### Customization
-Edit `tailwind.config.js` and `src/index.css` to customize:
-- Colors and themes
-- Border radius
-- Spacing
-- Typography
+**Configuration**: `tailwind.config.js`
 
-## 🔧 Configuration Files
+```javascript
+export default {
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  theme: {
+    extend: {
+      // Custom theme extensions
+    },
+  },
+}
+```
 
-- `vite.config.ts` - Vite configuration with path aliases
-- `tsconfig.json` - TypeScript configuration
-- `tailwind.config.js` - Tailwind CSS configuration
-- `postcss.config.js` - PostCSS configuration
+**Usage**:
+```tsx
+<button className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+  Click me
+</button>
+```
 
-## 🐛 Troubleshooting
+### ShadCN UI Components
 
-### Build Errors
+**Installation**: Components are copied into `src/components/ui/`
+
+**Benefits**:
+- Full control over component code
+- Customizable styling
+- Consistent design system
+- Accessible by default (Radix UI)
+
+**Usage**:
+```tsx
+import { Button } from '@/components/ui/button'
+
+<Button variant="default" size="lg">
+  Create Q&A
+</Button>
+```
+
+### Custom Utilities
+
+**lib/utils.ts**:
+```typescript
+import { clsx, type ClassValue } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+```
+
+Combines `clsx` for conditional classes with `twMerge` for Tailwind class conflicts.
+
+### Global Styles
+
+**index.css**:
+- Tailwind directives (`@tailwind base`, etc.)
+- CSS custom properties for theming
+- Global resets and base styles
+
+## Development Workflows
+
+### Adding a New Feature
+
+1. **Create feature directory**:
+   ```
+   src/features/my-feature/
+   ├── api/
+   ├── components/
+   ├── pages/
+   └── types.ts
+   ```
+
+2. **Define types** (`types.ts`):
+   ```typescript
+   export interface MyData {
+     id: string
+     name: string
+   }
+   ```
+
+3. **Create RTK Query API** (`api/myApi.ts`):
+   ```typescript
+   export const myApi = createApi({
+     reducerPath: 'myApi',
+     baseQuery: fetchBaseQuery({ baseUrl: API_BASE_URL }),
+     endpoints: (builder) => ({
+       // Define endpoints
+     }),
+   })
+   ```
+
+4. **Add to store** (`app/store.ts`):
+   ```typescript
+   reducer: {
+     [myApi.reducerPath]: myApi.reducer,
+   },
+   middleware: (gDM) => gDM().concat(myApi.middleware),
+   ```
+
+5. **Create components** and **pages**
+
+6. **Add route** (`App.tsx`)
+
+### Adding a UI Component
+
+Using ShadCN CLI:
+
+```bash
+npx shadcn-ui@latest add [component-name]
+```
+
+Example:
+```bash
+npx shadcn-ui@latest add alert
+npx shadcn-ui@latest add badge
+```
+
+This copies the component to `src/components/ui/`
+
+### Code Style
+
+**TypeScript**:
+- Use interfaces for object types
+- Use type for unions/primitives
+- Explicit return types on functions
+- Prefer `const` over `let`
+
+**React**:
+- Functional components only
+- Named exports for components
+- Props interface above component
+- Destructure props in parameters
+
+**Imports**:
+```typescript
+// External libraries first
+import { useState } from 'react'
+
+// Internal imports
+import { Button } from '@/components/ui/button'
+import { useListQAPairsQuery } from '@/features/qa/api/qaApi'
+import type { QAPair } from '@/types/api'
+```
+
+### Git Workflow
+
+```bash
+# Create feature branch
+git checkout -b feature/my-feature
+
+# Make changes
+# ...
+
+# Commit with descriptive message
+git add .
+git commit -m "feat: add my feature"
+
+# Push and create PR
+git push origin feature/my-feature
+```
+
+## Build and Deployment
+
+### Build for Production
+
+```bash
+# Build
+npm run build
+
+# Output in dist/ directory
+ls -la dist/
+```
+
+**Build output**:
+- Optimized JavaScript bundles
+- CSS extracted and minified
+- Assets hashed for cache busting
+- HTML with preloaded resources
+
+### Preview Production Build
+
+```bash
+npm run preview
+```
+
+Serves the production build locally at http://localhost:4173
+
+### Environment Variables for Production
+
+Create `.env.production`:
+
+```bash
+VITE_API_BASE_URL=https://api.yourcompany.com
+VITE_AGENT_URL=https://agent.yourcompany.com
+```
+
+### Deployment Options
+
+#### Static Hosting (Recommended)
+
+Since this is a SPA, deploy to:
+- **Vercel**: `vercel deploy`
+- **Netlify**: `netlify deploy`
+- **AWS S3 + CloudFront**
+- **GitHub Pages**
+
+#### Docker
+
+```dockerfile
+FROM node:18-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/nginx.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+#### Nginx Configuration
+
+```nginx
+server {
+  listen 80;
+  root /usr/share/nginx/html;
+  index index.html;
+
+  location / {
+    try_files $uri $uri/ /index.html;
+  }
+
+  location /api {
+    proxy_pass http://backend:8080;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+  }
+}
+```
+
+## Troubleshooting
+
+### Port 5173 Already in Use
+
+```bash
+# Find process
+lsof -i :5173
+
+# Kill process
+kill -9 <PID>
+
+# Or use different port
+npm run dev -- --port 3000
+```
+
+### Cannot Connect to Backend
+
+1. **Check backend is running**:
+   ```bash
+   curl http://localhost:8080/health
+   ```
+
+2. **Check CORS**: Backend must allow `http://localhost:5173`
+
+3. **Check proxy** in `vite.config.ts`
+
+4. **Check environment variable**:
+   ```bash
+   echo $VITE_API_BASE_URL
+   ```
+
+### Module Resolution Errors
+
 ```bash
 # Clear node_modules and reinstall
 rm -rf node_modules package-lock.json
 npm install
+
+# Clear Vite cache
+rm -rf node_modules/.vite
 ```
 
-### Type Errors
+### TypeScript Errors
+
 ```bash
-# Run type checking
-npx tsc --noEmit
+# Check types
+npm run type-check
+
+# Restart TypeScript server in VSCode
+Cmd/Ctrl + Shift + P → "TypeScript: Restart TS Server"
 ```
 
-### API Connection Issues
-- Ensure backend is running on `http://localhost:8080`
-- Check browser console for CORS errors
-- Verify Vite proxy configuration in `vite.config.ts`
-
-### Port Already in Use
-```bash
-# Vite will automatically try the next available port
-# Or specify a different port:
-npm run dev -- --port 5174
-```
-
-## 📝 Code Style
-
-- **Component naming**: PascalCase for components
-- **File naming**: PascalCase for component files, camelCase for utilities
-- **Imports**: Use absolute imports with `@/` alias
-- **State management**: RTK Query for server state, useState for local UI state
-- **Error handling**: Try-catch with toast notifications
-- **TypeScript**: Strict mode enabled, explicit types preferred
-
-## 🚀 Deployment
-
-### Production Build
+### Build Errors
 
 ```bash
-# Build for production
+# Clear dist folder
+rm -rf dist
+
+# Rebuild
 npm run build
-
-# Output will be in dist/ directory
 ```
 
-### Environment Variables for Production
+### Hot Reload Not Working
 
-Set these in your hosting platform:
+1. Save files to trigger HMR
+2. Check console for errors
+3. Restart dev server
+4. Check `.gitignore` doesn't ignore source files
 
-```env
-VITE_API_BASE_URL=https://api.yourdomain.com
+## Performance Optimization
+
+### Current Optimizations
+
+1. **Code Splitting**: Automatic route-based splitting
+2. **Tree Shaking**: Vite removes unused code
+3. **Asset Optimization**: Images and CSS optimized
+4. **Lazy Loading**: Components loaded on demand
+5. **Cache Headers**: Immutable assets with hashing
+
+### Future Enhancements
+
+1. **React.lazy**: Lazy load heavy components
+2. **Virtual Scrolling**: For large Q&A lists
+3. **Service Worker**: Offline support
+4. **Image Optimization**: WebP format, lazy loading
+5. **Bundle Analysis**: Identify large dependencies
+
+## Testing (Future)
+
+### Recommended Testing Stack
+
+```bash
+npm install -D vitest @testing-library/react @testing-library/user-event jsdom
 ```
 
-### Hosting Options
+### Test Structure
 
-- **Vercel** - Automatic deployment from Git
-- **Netlify** - Static site hosting
-- **AWS S3 + CloudFront** - Scalable hosting
-- **Docker** - Container deployment (can be added)
+```
+features/
+├── qa/
+│   ├── __tests__/
+│   │   ├── QATable.test.tsx
+│   │   ├── QAForm.test.tsx
+│   │   └── qaApi.test.ts
+```
 
-## 📄 License
+### Example Test
 
-MIT
+```typescript
+import { render, screen } from '@testing-library/react'
+import { QATable } from './QATable'
 
-## 🤝 Contributing
+test('renders Q&A table', () => {
+  render(<QATable data={[]} loading={false} />)
+  expect(screen.getByText('No Q&A pairs')).toBeInTheDocument()
+})
+```
 
-This is part of the Smart Company Discovery Assistant project. See the main README for overall project information.
+## Related Documentation
+
+- [Main README](../README.md) - Full application setup
+- [Backend README](../backend/README.md) - Go backend API
+- [Python Agent README](../python-agent/README.md) - AI agent details
+- [ShadCN UI Docs](https://ui.shadcn.com/) - Component library
+- [Tailwind CSS Docs](https://tailwindcss.com/) - Styling framework
+- [Redux Toolkit Docs](https://redux-toolkit.js.org/) - State management
+- [Vite Docs](https://vitejs.dev/) - Build tool
+
+---
+
+**Built with modern React best practices** ⚡
