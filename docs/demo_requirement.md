@@ -114,7 +114,7 @@ Styling can be minimal — focus on clear structure and usability.
 ○ Flask service base URL
 ○ LLM API keys
 ● Include .env.example for reference.
-● Instructions to initialize DB, run both services, and seed data.
+● Instructions to initialize DB and run both services.
 ```
 ### 🧠 Bonus (Optional)
 

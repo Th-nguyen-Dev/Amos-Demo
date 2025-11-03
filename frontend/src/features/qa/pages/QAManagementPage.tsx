@@ -33,7 +33,6 @@ export function QAManagementPage() {
   const [search, setSearch] = useState('')
   const [cursor, setCursor] = useState<string | undefined>(undefined)
   const [direction, setDirection] = useState<'next' | 'prev'>('next')
-  const [cursorHistory, setCursorHistory] = useState<string[]>([]) // Track cursor history for back navigation
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -45,7 +44,6 @@ export function QAManagementPage() {
   // Reset pagination when search changes
   useEffect(() => {
     setCursor(undefined)
-    setCursorHistory([])
     setDirection('next')
   }, [debouncedSearch])
 
@@ -74,7 +72,7 @@ export function QAManagementPage() {
       setCreateDialogOpen(false)
       // Reset to first page after creating
       setCursor(undefined)
-      setCursorHistory([])
+      setDirection('next')
       toast.success('Q&A pair created successfully')
     } catch (err) {
       console.error('Failed to create Q&A pair:', err)
@@ -115,7 +113,7 @@ export function QAManagementPage() {
       setSelectedQAPair(null)
       // Reset to first page after deleting
       setCursor(undefined)
-      setCursorHistory([])
+      setDirection('next')
       toast.success('Q&A pair deleted successfully')
     } catch (err) {
       console.error('Failed to delete Q&A pair:', err)
@@ -125,28 +123,17 @@ export function QAManagementPage() {
 
   const handleNextPage = useCallback(() => {
     if (data?.pagination.next_cursor) {
-      // Add current cursor to history before moving forward
-      if (cursor) {
-        setCursorHistory(prev => [...prev, cursor])
-      } else {
-        // First page, add marker for "no cursor"
-        setCursorHistory(prev => [...prev, ''])
-      }
       setCursor(data.pagination.next_cursor)
       setDirection('next')
     }
-  }, [data, cursor])
+  }, [data])
 
   const handlePrevPage = useCallback(() => {
-    // Use cursor history to go back
-    if (cursorHistory.length > 0) {
-      const newHistory = [...cursorHistory]
-      const previousCursor = newHistory.pop()
-      setCursorHistory(newHistory)
-      setCursor(previousCursor || undefined)
+    if (data?.pagination.prev_cursor) {
+      setCursor(data.pagination.prev_cursor)
       setDirection('prev')
     }
-  }, [cursorHistory])
+  }, [data])
 
   return (
     <div className="space-y-6">
@@ -189,7 +176,7 @@ export function QAManagementPage() {
           />
 
           {/* Pagination */}
-          {data && (data.data.length > 0 || cursorHistory.length > 0) && (
+          {data && data.data.length > 0 && (
             <div className="flex justify-between items-center">
               <div className="text-sm text-muted-foreground">
                 {data.data.length} Q&A pair{data.data.length !== 1 ? 's' : ''} displayed
@@ -198,7 +185,7 @@ export function QAManagementPage() {
                 <Button
                   variant="outline"
                   onClick={handlePrevPage}
-                  disabled={cursorHistory.length === 0}
+                  disabled={!data.pagination.has_prev}
                 >
                   Previous
                 </Button>

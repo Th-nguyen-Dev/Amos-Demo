@@ -25,7 +25,7 @@ Successfully migrated from SQLite to PostgreSQL with Docker containerization, in
 
 - **Makefile** - Common development commands
   - `make dev` - Start development environment
-  - `make dev-reset` - Fresh start with seed data
+  - `make dev-reset` - Fresh start with clean database
   - `make test-integration` - Run integration tests
   - `make clean` - Clean up all containers
 
@@ -75,12 +75,12 @@ db, _ := testutil.GetTestDB(t.Name())
 defer db.Close()  // Automatic rollback
 ```
 
-### 5. Migration & Seed Data ✓
+### 5. Migration & Schema ✓
 - **001_init_schema.sql** - Updated with PostgreSQL features
-- **002_seed_data.sql** - Demo data for testing
-  - 10 QA pairs
-  - 3 conversations with realistic message history
-  - JSONB formatted messages
+  - TIMESTAMPTZ for timestamps
+  - UUIDv7 support
+  - GIN indexes for JSONB and FTS
+  - Optimized constraints
 
 ### 6. Connection Pool Configuration ✓
 ```go
@@ -94,7 +94,6 @@ db.SetConnMaxLifetime(5 * time.Minute)
 - `docker-compose.test.yml`
 - `backend/Dockerfile`
 - `backend/.dockerignore`
-- `backend/migrations/002_seed_data.sql`
 - `backend/internal/testutil/db.go`
 - `Makefile`
 
@@ -114,7 +113,7 @@ db.SetConnMaxLifetime(5 * time.Minute)
 
 ### Development
 ```bash
-# Start development environment (first run auto-loads schema + seed data)
+# Start development environment (first run auto-loads schema)
 make dev
 
 # View logs
@@ -184,7 +183,7 @@ For local development outside Docker, set these to `localhost:5432`.
 
 1. Run `make dev` to start the environment
 2. Test API endpoints at `http://localhost:8080`
-3. Verify seed data is loaded
+3. Add Q&A pairs via the frontend or API
 4. Run integration tests with `make test-integration`
 5. Deploy using `docker-compose up -d` in production
 

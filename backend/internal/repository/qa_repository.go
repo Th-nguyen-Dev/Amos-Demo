@@ -141,9 +141,9 @@ func (r *qaRepository) List(ctx context.Context, params models.CursorParams) ([]
 		}
 
 		if params.Direction == "prev" {
-			whereClauses = append(whereClauses, "created_at > (SELECT created_at FROM qa_pairs WHERE id = $1)")
+			whereClauses = append(whereClauses, "id > $1")
 		} else {
-			whereClauses = append(whereClauses, "created_at < (SELECT created_at FROM qa_pairs WHERE id = $1)")
+			whereClauses = append(whereClauses, "id < $1")
 		}
 		args = append(args, cursorID)
 	}
@@ -154,8 +154,7 @@ func (r *qaRepository) List(ctx context.Context, params models.CursorParams) ([]
 	}
 
 	// Determine sort order
-	// If no cursor, always use DESC (newest first) regardless of direction
-	// If cursor exists, use direction to determine order
+	// UUIDv7 is time-ordered, so DESC = newest first, ASC = oldest first
 	order := "DESC"
 	if params.Cursor != "" && params.Direction == "prev" {
 		order = "ASC"
@@ -167,7 +166,7 @@ func (r *qaRepository) List(ctx context.Context, params models.CursorParams) ([]
 		SELECT id, question, answer, created_at, updated_at
 		FROM qa_pairs
 		%s
-		ORDER BY created_at %s
+		ORDER BY id %s
 		LIMIT $%d
 	`, whereSQL, order, len(args)+1)
 

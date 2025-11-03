@@ -16,9 +16,10 @@ async def search_knowledge_base(
     """
     🔍 KEYWORD SEARCH: Search the company knowledge base using full-text keyword matching.
     
-    Use this as a fallback if semantic_search_knowledge_base doesn't find relevant results.
-    Good for exact keyword matches and specific technical terms.
+    ⚠️ ALWAYS use this TOGETHER WITH semantic_search_knowledge_base for every question!
+    Do NOT use this as a fallback - use BOTH search methods EVERY TIME.
     
+    Good for exact keyword matches and specific technical terms that semantic search might miss.
     This searches through all available Q&A pairs and returns the most relevant matches.
     If you don't find what you need, try different keywords or search terms.
     
@@ -87,8 +88,11 @@ async def semantic_search_knowledge_base(
     """
     🎯 SEMANTIC SEARCH: Search the knowledge base using AI-powered semantic similarity (Pinecone vector search).
     
+    ⚠️ ALWAYS use this TOGETHER WITH search_knowledge_base for every question!
+    Do NOT rely on this alone - use BOTH search methods EVERY TIME.
+    
     Use this for finding conceptually related content, even if keywords don't match exactly.
-    This is more powerful than text search for understanding meaning and context.
+    This is powerful for understanding meaning and context, but may miss exact keyword matches.
     
     Returns: Matching Q&A pairs with similarity scores (0.0-1.0, higher is more similar).
     """
