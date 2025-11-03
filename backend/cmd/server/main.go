@@ -78,20 +78,25 @@ func main() {
 		embeddingClient = clients.NewMockEmbeddingClient(768)
 	}
 
-	// Initialize Pinecone client
+	// Initialize Pinecone client (using official SDK)
 	var pineconeClient clients.PineconeClient
-	if cfg.Pinecone.APIKey != "" && cfg.Pinecone.IndexName != "" && cfg.Pinecone.Environment != "" {
+	if cfg.Pinecone.APIKey != "" && cfg.Pinecone.IndexName != "" {
 		pineconeClient, err = clients.NewPineconeClient(clients.PineconeConfig{
 			APIKey:      cfg.Pinecone.APIKey,
 			Environment: cfg.Pinecone.Environment,
 			IndexName:   cfg.Pinecone.IndexName,
 			Namespace:   cfg.Pinecone.Namespace,
+			Host:        cfg.Pinecone.Host, // For Pinecone Local
 		})
 		if err != nil {
 			log.Printf("Warning: Failed to initialize Pinecone client: %v. Using mock client.", err)
 			pineconeClient = clients.NewMockPineconeClient()
 		} else {
-			log.Println("✓ Successfully initialized Pinecone client")
+			if cfg.Pinecone.Host != "" {
+				log.Printf("✓ Successfully initialized Pinecone Local at %s", cfg.Pinecone.Host)
+			} else {
+				log.Println("✓ Successfully initialized Pinecone client (cloud)")
+			}
 		}
 	} else {
 		log.Println("ℹ Pinecone not configured. Using mock Pinecone client.")

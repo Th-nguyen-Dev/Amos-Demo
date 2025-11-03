@@ -1,220 +1,167 @@
 package clients
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"time"
+
+	"github.com/pinecone-io/go-pinecone/v4/pinecone"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // PineconeConfig holds configuration for Pinecone client
 type PineconeConfig struct {
 	APIKey      string
-	Environment string
+	Environment string // No longer needed with official SDK, but kept for compatibility
 	IndexName   string
 	Namespace   string
+	Host        string // Optional: For Pinecone Local (e.g., "http://localhost:5081")
 }
 
-// realPineconeClient implements PineconeClient using the Pinecone REST API
-type realPineconeClient struct {
-	apiKey      string
-	environment string
-	indexName   string
-	namespace   string
-	host        string
-	httpClient  *http.Client
+// officialPineconeClient implements PineconeClient using the official Pinecone Go SDK
+type officialPineconeClient struct {
+	client    *pinecone.Client
+	indexConn *pinecone.IndexConnection
+	namespace string
 }
 
-// NewPineconeClient creates a new Pinecone client
+// NewPineconeClient creates a new Pinecone client using the official SDK
 func NewPineconeClient(config PineconeConfig) (PineconeClient, error) {
 	if config.APIKey == "" {
-		return nil, fmt.Errorf("Pinecone API key is required")
+		return nil, fmt.Errorf("pinecone API key is required")
 	}
 	if config.IndexName == "" {
-		return nil, fmt.Errorf("Pinecone index name is required")
-	}
-	if config.Environment == "" {
-		return nil, fmt.Errorf("Pinecone environment is required")
+		return nil, fmt.Errorf("pinecone index name is required")
 	}
 
-	// Construct the host URL for the index
-	host := fmt.Sprintf("https://%s-%s.svc.%s.pinecone.io",
-		config.IndexName, "default", config.Environment)
+	ctx := context.Background()
 
-	return &realPineconeClient{
-		apiKey:      config.APIKey,
-		environment: config.Environment,
-		indexName:   config.IndexName,
-		namespace:   config.Namespace,
-		host:        host,
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+	// Check if using Pinecone Local (for local development)
+	if config.Host != "" {
+		// Pinecone Local mode - connect directly to local instance
+		pc, err := pinecone.NewClient(pinecone.NewClientParams{
+			ApiKey: config.APIKey, // "pclocal" for local
+			Host:   config.Host,   // e.g., "http://localhost:5081"
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create pinecone local client: %w", err)
+		}
+
+		// For Pinecone Local, use the host directly
+		idxConnection, err := pc.Index(pinecone.NewIndexConnParams{
+			Host:      config.Host,
+			Namespace: config.Namespace,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to connect to pinecone local: %w", err)
+		}
+
+		return &officialPineconeClient{
+			client:    pc,
+			indexConn: idxConnection,
+			namespace: config.Namespace,
+		}, nil
+	}
+
+	// Cloud mode - use standard Pinecone service
+	pc, err := pinecone.NewClient(pinecone.NewClientParams{
+		ApiKey: config.APIKey,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pinecone client: %w", err)
+	}
+
+	// Describe index to get host
+	idx, err := pc.DescribeIndex(ctx, config.IndexName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to describe index '%s': %w", config.IndexName, err)
+	}
+
+	// Create index connection
+	idxConnection, err := pc.Index(pinecone.NewIndexConnParams{
+		Host:      idx.Host,
+		Namespace: config.Namespace,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to index: %w", err)
+	}
+
+	return &officialPineconeClient{
+		client:    pc,
+		indexConn: idxConnection,
+		namespace: config.Namespace,
 	}, nil
 }
 
-// upsertRequest represents a Pinecone upsert request
-type upsertRequest struct {
-	Vectors   []vector `json:"vectors"`
-	Namespace string   `json:"namespace,omitempty"`
-}
+// Upsert inserts or updates a vector in Pinecone using the official SDK
+func (c *officialPineconeClient) Upsert(ctx context.Context, id string, values []float32, metadata map[string]interface{}) error {
+	// Convert metadata to protobuf Struct (per official SDK examples)
+	var pineconeMetadata *structpb.Struct
+	if metadata != nil {
+		pbStruct, err := structpb.NewStruct(metadata)
+		if err != nil {
+			return fmt.Errorf("failed to convert metadata: %w", err)
+		}
+		pineconeMetadata = pbStruct
+	}
 
-// vector represents a single vector in Pinecone
-type vector struct {
-	ID       string                 `json:"id"`
-	Values   []float32              `json:"values"`
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
-}
-
-// queryRequest represents a Pinecone query request
-type queryRequest struct {
-	Vector          []float32 `json:"vector"`
-	TopK            int       `json:"topK"`
-	IncludeMetadata bool      `json:"includeMetadata"`
-	IncludeValues   bool      `json:"includeValues"`
-	Namespace       string    `json:"namespace,omitempty"`
-}
-
-// queryResponse represents a Pinecone query response
-type queryResponse struct {
-	Matches []struct {
-		ID       string                 `json:"id"`
-		Score    float32                `json:"score"`
-		Values   []float32              `json:"values,omitempty"`
-		Metadata map[string]interface{} `json:"metadata,omitempty"`
-	} `json:"matches"`
-}
-
-// deleteRequest represents a Pinecone delete request
-type deleteRequest struct {
-	IDs       []string `json:"ids,omitempty"`
-	DeleteAll bool     `json:"deleteAll,omitempty"`
-	Namespace string   `json:"namespace,omitempty"`
-}
-
-// Upsert inserts or updates a vector in Pinecone
-func (c *realPineconeClient) Upsert(ctx context.Context, id string, values []float32, metadata map[string]interface{}) error {
-	req := upsertRequest{
-		Vectors: []vector{
-			{
-				ID:       id,
-				Values:   values,
-				Metadata: metadata,
-			},
+	// Create vector (following official SDK pattern)
+	// Note: Vector.Values is *[]float32, so we take address of the slice
+	vectors := []*pinecone.Vector{
+		{
+			Id:       id,
+			Values:   &values,
+			Metadata: pineconeMetadata,
 		},
-		Namespace: c.namespace,
 	}
 
-	body, err := json.Marshal(req)
+	// Upsert to Pinecone
+	_, err := c.indexConn.UpsertVectors(ctx, vectors)
 	if err != nil {
-		return fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.host+"/vectors/upsert", bytes.NewBuffer(body))
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	httpReq.Header.Set("Api-Key", c.apiKey)
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("upsert failed with status %d: %s", resp.StatusCode, string(bodyBytes))
+		return fmt.Errorf("failed to upsert vector: %w", err)
 	}
 
 	return nil
 }
 
-// Query performs a similarity search in Pinecone
-func (c *realPineconeClient) Query(ctx context.Context, vector []float32, topK int) ([]PineconeMatch, error) {
-	req := queryRequest{
+// Query performs a similarity search in Pinecone using the official SDK
+func (c *officialPineconeClient) Query(ctx context.Context, vector []float32, topK int) ([]PineconeMatch, error) {
+	// Query Pinecone (following official SDK pattern from README)
+	topKUint := uint32(topK)
+
+	res, err := c.indexConn.QueryByVectorValues(ctx, &pinecone.QueryByVectorValuesRequest{
 		Vector:          vector,
-		TopK:            topK,
-		IncludeMetadata: true,
-		IncludeValues:   false,
-		Namespace:       c.namespace,
-	}
-
-	body, err := json.Marshal(req)
+		TopK:            topKUint,
+		IncludeMetadata: true, // bool, not pointer
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, fmt.Errorf("failed to query vectors: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.host+"/query", bytes.NewBuffer(body))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
+	// Convert results to our format
+	matches := make([]PineconeMatch, len(res.Matches))
+	for i, match := range res.Matches {
+		// Convert metadata from protobuf Struct to map (per official SDK)
+		metadata := make(map[string]interface{})
+		if match.Vector.Metadata != nil {
+			metadata = match.Vector.Metadata.AsMap()
+		}
 
-	httpReq.Header.Set("Api-Key", c.apiKey)
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("query failed with status %d: %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	var queryResp queryResponse
-	if err := json.NewDecoder(resp.Body).Decode(&queryResp); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	matches := make([]PineconeMatch, len(queryResp.Matches))
-	for i, match := range queryResp.Matches {
 		matches[i] = PineconeMatch{
-			ID:       match.ID,
+			ID:       match.Vector.Id,
 			Score:    match.Score,
-			Metadata: match.Metadata,
+			Metadata: metadata,
 		}
 	}
 
 	return matches, nil
 }
 
-// Delete removes a vector from Pinecone
-func (c *realPineconeClient) Delete(ctx context.Context, id string) error {
-	req := deleteRequest{
-		IDs:       []string{id},
-		Namespace: c.namespace,
-	}
-
-	body, err := json.Marshal(req)
+// Delete removes a vector from Pinecone using the official SDK
+func (c *officialPineconeClient) Delete(ctx context.Context, id string) error {
+	// Following official SDK pattern from README
+	err := c.indexConn.DeleteVectorsById(ctx, []string{id})
 	if err != nil {
-		return fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.host+"/vectors/delete", bytes.NewBuffer(body))
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	httpReq.Header.Set("Api-Key", c.apiKey)
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("delete failed with status %d: %s", resp.StatusCode, string(bodyBytes))
+		return fmt.Errorf("failed to delete vector: %w", err)
 	}
 
 	return nil

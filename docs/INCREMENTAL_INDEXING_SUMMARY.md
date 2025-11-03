@@ -22,16 +22,19 @@ Successfully implemented **automatic incremental indexing** for Q&A pairs using 
 ### 2. Pinecone Client
 **File**: `backend/internal/clients/pinecone_client.go`
 
-- Real Pinecone client using REST API
+- **Uses official Pinecone Go SDK v4** (github.com/pinecone-io/go-pinecone/v4)
+- gRPC-based communication for high performance
 - Supports upsert, query, and delete operations
 - Works with Pinecone serverless or pod-based indexes
 - Mock client available for testing
 
 **Key Features**:
+- Official SDK maintained by Pinecone
+- gRPC for data plane operations
 - Namespace support
-- Metadata storage
+- Metadata storage with protobuf
 - Cosine similarity search
-- Error handling and retries
+- Production-ready error handling
 
 ### 3. Embedding Service
 **File**: `backend/internal/service/embedding_service.go`

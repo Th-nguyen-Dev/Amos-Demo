@@ -24,7 +24,8 @@ This ensures the vector database is always in sync with the PostgreSQL database.
 2. **Pinecone Client** (`internal/clients/pinecone_client.go`)
    - Handles vector storage and retrieval in Pinecone
    - Implements upsert, query, and delete operations
-   - Uses Pinecone REST API
+   - **Uses official Pinecone Go SDK v4** (github.com/pinecone-io/go-pinecone/v4)
+   - gRPC-based for high performance
    - Mock client available for development/testing
 
 3. **Embedding Service** (`internal/service/embedding_service.go`)

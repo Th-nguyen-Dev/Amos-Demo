@@ -31,6 +31,7 @@ func LoadConfig() (*models.Config, error) {
 			Environment: getEnv("PINECONE_ENVIRONMENT", ""),
 			IndexName:   getEnv("PINECONE_INDEX_NAME", ""),
 			Namespace:   getEnv("PINECONE_NAMESPACE", ""),
+			Host:        getEnv("PINECONE_HOST", ""), // For Pinecone Local
 		},
 		GoogleEmbedding: models.GoogleEmbeddingConfig{
 			APIKey:    getEnv("GOOGLE_API_KEY", ""),
@@ -78,4 +79,3 @@ func validateConfig(config *models.Config) error {
 
 	return nil
 }
-
