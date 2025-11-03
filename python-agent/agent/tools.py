@@ -10,14 +10,18 @@ backend_client = BackendClient()
 
 @tool
 async def search_knowledge_base(
-    query: Annotated[str, "The search query to find relevant Q&A pairs"],
+    query: Annotated[str, "The search query to find relevant Q&A pairs. Be specific with keywords."],
     limit: Annotated[int, "Number of results to return (1-10)"] = 5
 ) -> str:
     """
-    Search the company knowledge base for relevant Q&A pairs using full-text search.
-    Use this when the user asks questions about policies, procedures, products, or company information.
+    🔍 PRIMARY TOOL: Search the company knowledge base for relevant Q&A pairs using full-text search.
     
-    Returns matching question-answer pairs from the knowledge base.
+    ⚠️ USE THIS TOOL FIRST for ANY user question before responding!
+    
+    This searches through all available Q&A pairs and returns the most relevant matches.
+    If you don't find what you need, try different keywords or search terms.
+    
+    Returns: Matching question-answer pairs from the knowledge base with their IDs.
     """
     try:
         response = await backend_client.search_qa(query, min(limit, 10))
@@ -107,10 +111,41 @@ async def semantic_search_knowledge_base(
         return f"Error in semantic search: {str(e)}"
 
 
+@tool
+async def list_knowledge_base_topics() -> str:
+    """
+    📋 List all available Q&A pairs in the knowledge base to see what topics are covered.
+    
+    Use this tool to:
+    - See what information is available before searching
+    - Understand what topics you can help users with
+    - Get an overview of the knowledge base contents
+    
+    Returns: A list of all Q&A pair questions/topics currently in the knowledge base.
+    """
+    try:
+        # Get all QA pairs with a high limit
+        response = await backend_client.search_qa("", limit=100)
+        
+        if response.count == 0:
+            return "The knowledge base is currently empty. No Q&A pairs have been added yet."
+        
+        topics = []
+        for i, qa in enumerate(response.qa_pairs, 1):
+            topics.append(f"{i}. {qa.question} (ID: {qa.id})")
+        
+        header = f"📚 Knowledge Base Contents ({response.count} Q&A pairs):\n\n"
+        return header + "\n".join(topics)
+    except Exception as e:
+        return f"Error listing topics: {str(e)}"
+
+
 # Complete tool list - Agent will choose which tools to use based on context
+# ORDER MATTERS: Most important tools first
 tools = [
-    search_knowledge_base,
-    get_qa_by_ids,
-    semantic_search_knowledge_base,
+    search_knowledge_base,          # Primary tool - use this first!
+    list_knowledge_base_topics,     # Helper to see what's available
+    semantic_search_knowledge_base, # Alternative search method
+    get_qa_by_ids,                  # For retrieving specific items
 ]
 

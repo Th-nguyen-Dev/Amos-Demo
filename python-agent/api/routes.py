@@ -45,4 +45,3 @@ async def get_messages(conversation_id: UUID):
         return {"messages": messages}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-

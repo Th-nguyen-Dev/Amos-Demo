@@ -24,7 +24,8 @@ class FunctionCall(BaseModel):
 
 class Message(BaseModel):
     """OpenAI message format matching Go backend."""
-    model_config = ConfigDict(strict=True)
+    # Allow type coercion for UUID and datetime strings from backend
+    model_config = ConfigDict(strict=False)
     
     id: UUID
     conversation_id: UUID
@@ -37,7 +38,8 @@ class Message(BaseModel):
 
 class Conversation(BaseModel):
     """Conversation model matching Go backend."""
-    model_config = ConfigDict(strict=True)
+    # Allow type coercion for UUID and datetime strings from backend
+    model_config = ConfigDict(strict=False)
     
     id: UUID
     title: Optional[str] = None
@@ -47,7 +49,8 @@ class Conversation(BaseModel):
 
 class QAPair(BaseModel):
     """QA pair model matching Go backend."""
-    model_config = ConfigDict(strict=True)
+    # Allow type coercion for UUID and datetime strings from backend
+    model_config = ConfigDict(strict=False)
     
     id: UUID
     question: str

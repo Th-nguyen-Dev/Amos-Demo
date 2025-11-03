@@ -29,12 +29,9 @@ services:
       - PORT=5081
       - PINECONE_HOST=pinecone-local
     ports:
-      - "5081-6000:5081-6000"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5081/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - "5081:5081"
+    # Healthcheck disabled - pinecone-local doesn't have curl/wget and /health endpoint returns 404
+    # The service is working if the port is accessible
     # Note: No volumes - data is lost on restart (testing only)
 
   backend:
@@ -76,7 +73,7 @@ services:
       postgres:
         condition: service_healthy
       pinecone-local:
-        condition: service_healthy
+        condition: service_started
     restart: unless-stopped
 
   python-agent:
@@ -98,7 +95,7 @@ services:
       # API Configuration
       - API_HOST=0.0.0.0
       - API_PORT=8000
-      - CORS_ORIGINS=["http://localhost:3000"]
+      - CORS_ORIGINS=["http://localhost:5173","http://localhost:3000"]
     ports:
       - "8000:8000"
     depends_on:

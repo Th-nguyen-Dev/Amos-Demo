@@ -5,118 +5,335 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ChatMessage } from '../components/ChatMessage'
 import { ChatInput } from '../components/ChatInput'
-import { useAskQuestionMutation } from '../api/chatApi'
-import type { ChatMessage as ChatMessageType } from '../types'
+import { StreamingMessage } from '../components/StreamingMessage'
+import {
+  useListConversationsQuery,
+  useGetMessagesQuery,
+  useCreateConversationMutation,
+  useDeleteConversationMutation,
+  sendMessageStreaming,
+} from '../api/chatApi'
+import { PlusIcon, TrashIcon } from 'lucide-react'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 
 export function ChatPage() {
-  const [messages, setMessages] = useState<ChatMessageType[]>([])
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
+  const [streamingMessage, setStreamingMessage] = useState<string>('')
+  const [streamingToolCalls, setStreamingToolCalls] = useState<Array<{name: string, status: 'loading' | 'complete'}>>([])
+  const [pendingUserMessage, setPendingUserMessage] = useState<string>('')
+  const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [conversationToDelete, setConversationToDelete] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const [askQuestion, { isLoading }] = useAskQuestionMutation()
+  // Fetch conversations
+  const { data: conversationsData, isLoading: conversationsLoading } = useListConversationsQuery()
+  const conversations = conversationsData?.data || []
+
+  // Fetch messages for selected conversation
+  const { data: messagesData, refetch: refetchMessages } = useGetMessagesQuery(
+    selectedConversationId || '',
+    { skip: !selectedConversationId }
+  )
+  const messages = messagesData?.data || []
+
+  const [createConversation, { isLoading: isCreating }] = useCreateConversationMutation()
+  const [deleteConversation, { isLoading: isDeleting }] = useDeleteConversationMutation()
 
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages.length, streamingMessage, pendingUserMessage])
 
-  const handleSubmit = async (question: string) => {
-    // Clear any previous errors
-    setError(null)
-
-    // Add user message
-    const userMessage: ChatMessageType = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: question,
-      timestamp: new Date(),
-    }
-    setMessages((prev) => [...prev, userMessage])
-
+  const handleNewConversation = async () => {
     try {
-      // Call the API
-      const response = await askQuestion({ question }).unwrap()
-
-      // Add assistant message
-      const assistantMessage: ChatMessageType = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: response.answer,
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, assistantMessage])
+      const result = await createConversation({
+        title: `Chat ${new Date().toLocaleString()}`,
+      }).unwrap()
+      setSelectedConversationId(result.id)
+      toast.success('New conversation created')
     } catch (err) {
-      console.error('Failed to get answer:', err)
-      setError('Failed to get an answer. Please try again.')
-      toast.error('Failed to get an answer from the AI assistant')
-      
-      // Remove the user message since the request failed
-      setMessages((prev) => prev.slice(0, -1))
+      console.error('Failed to create conversation:', err)
+      toast.error('Failed to create conversation')
     }
   }
 
-  const handleClear = () => {
-    setMessages([])
+  const handleDeleteConversation = async (id: string) => {
+    setConversationToDelete(id)
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!conversationToDelete) return
+
+    try {
+      await deleteConversation(conversationToDelete).unwrap()
+      if (selectedConversationId === conversationToDelete) {
+        setSelectedConversationId(null)
+      }
+      toast.success('Conversation deleted')
+    } catch (err) {
+      console.error('Failed to delete conversation:', err)
+      toast.error('Failed to delete conversation')
+    } finally {
+      setDeleteDialogOpen(false)
+      setConversationToDelete(null)
+    }
+  }
+
+  const handleSubmit = async (message: string) => {
+    if (!selectedConversationId) {
+      toast.error('Please select or create a conversation first')
+      return
+    }
+
     setError(null)
-    toast.success('Chat cleared')
+    setIsStreaming(true)
+    setPendingUserMessage(message) // Show user message immediately
+    setStreamingMessage('')
+    setStreamingToolCalls([])
+
+    try {
+      let fullText = ''
+      let cleanText = '' // Text without tool markers
+      
+      // Stream the response
+      for await (const chunk of sendMessageStreaming(selectedConversationId, message)) {
+        fullText += chunk
+        
+        // Detect tool start: 🔧 **Tool: {name}**
+        const toolStartMatch = fullText.match(/🔧 \*\*Tool: (.+?)\*\*/)
+        if (toolStartMatch && !streamingToolCalls.some(tc => tc.name === toolStartMatch[1])) {
+          const toolName = toolStartMatch[1]
+          setStreamingToolCalls(prev => [...prev, { name: toolName, status: 'loading' }])
+        }
+        
+        // Detect tool complete: ✅ Done
+        if (chunk.includes('✅ Done') || chunk.includes('❌ Done')) {
+          setStreamingToolCalls(prev => 
+            prev.map((tc, idx) => 
+              idx === prev.length - 1 ? { ...tc, status: 'complete' } : tc
+            )
+          )
+        }
+        
+        // Filter out tool markers from display
+        cleanText = fullText
+          .replace(/🔧 \*\*Tool: .+?\*\*/g, '')
+          .replace(/📋 \*\*Args:\*\* .+?\n/g, '')
+          .replace(/⏳ Executing\.\.\.\n/g, '')
+          .replace(/✅ Done\n\n/g, '')
+          .replace(/❌ Done\n\n/g, '')
+          .replace(/💡 Trying alternative approach\.\.\.\n\n/g, '')
+          .trim()
+        
+        setStreamingMessage(cleanText)
+      }
+
+      // After streaming is complete, clear streaming state and refetch messages
+      setPendingUserMessage('') // Clear pending message
+      setStreamingMessage('')
+      setStreamingToolCalls([])
+      setIsStreaming(false)
+      await refetchMessages()
+    } catch (err) {
+      console.error('Failed to send message:', err)
+      setError('Failed to send message. Please try again.')
+      toast.error('Failed to send message')
+      setPendingUserMessage('') // Clear on error
+      setIsStreaming(false)
+      setStreamingMessage('')
+      setStreamingToolCalls([])
+    }
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-start">
-            <div>
-              <CardTitle>Ask the AI Assistant</CardTitle>
-              <CardDescription>
-                Ask questions about your Q&A knowledge base
-              </CardDescription>
-            </div>
-            {messages.length > 0 && (
-              <Button variant="outline" onClick={handleClear}>
-                Clear Chat
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Error message */}
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          {/* Messages */}
-          <div className="border rounded-lg p-4 min-h-[400px] max-h-[600px] overflow-y-auto bg-muted/20">
-            {messages.length === 0 ? (
-              <div className="flex items-center justify-center h-[400px] text-muted-foreground">
-                <div className="text-center">
-                  <p className="text-lg font-medium mb-2">
-                    No messages yet
-                  </p>
-                  <p className="text-sm">
-                    Start by asking a question below
-                  </p>
-                </div>
+    <div className="flex h-[calc(100vh-8rem)] gap-4">
+      {/* Sidebar - Conversations List */}
+      <div className="w-64 shrink-0">
+        <Card className="h-full flex flex-col">
+          <CardHeader>
+            <CardTitle className="text-lg">Conversations</CardTitle>
+            <Button
+              onClick={handleNewConversation}
+              disabled={isCreating}
+              size="sm"
+              className="w-full mt-2"
+            >
+              <PlusIcon className="w-4 h-4 mr-2" />
+              New Chat
+            </Button>
+          </CardHeader>
+          <CardContent className="flex-1 overflow-y-auto p-2">
+            {conversationsLoading ? (
+              <div className="text-sm text-muted-foreground text-center py-4">
+                Loading...
+              </div>
+            ) : conversations.length === 0 ? (
+              <div className="text-sm text-muted-foreground text-center py-4">
+                No conversations yet
               </div>
             ) : (
-              <>
-                {messages.map((message) => (
-                  <ChatMessage key={message.id} message={message} />
+              <div className="space-y-1">
+                {conversations.map((conv) => (
+                  <div
+                    key={conv.id}
+                    className={`group relative flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
+                      selectedConversationId === conv.id
+                        ? 'bg-primary text-primary-foreground'
+                        : 'hover:bg-muted'
+                    }`}
+                    onClick={() => setSelectedConversationId(conv.id)}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{conv.title}</p>
+                      <p className="text-xs opacity-70 truncate">
+                        {new Date(conv.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="opacity-0 group-hover:opacity-100 h-6 w-6"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteConversation(conv.id)
+                      }}
+                      disabled={isDeleting}
+                    >
+                      <TrashIcon className="w-3 h-3" />
+                    </Button>
+                  </div>
                 ))}
-                <div ref={messagesEndRef} />
-              </>
+              </div>
             )}
-          </div>
+          </CardContent>
+        </Card>
+      </div>
 
-          {/* Input */}
-          <ChatInput
-            onSubmit={handleSubmit}
-            isLoading={isLoading}
-          />
-        </CardContent>
-      </Card>
+      {/* Main Chat Area */}
+      <div className="flex-1">
+        <Card className="h-full flex flex-col">
+          <CardHeader>
+            <CardTitle>AI Assistant</CardTitle>
+            <CardDescription>
+              Ask questions about your Q&A knowledge base
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col space-y-4 overflow-hidden">
+            {/* Error message */}
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            {/* Messages */}
+            <div className="flex-1 border rounded-lg p-4 overflow-y-auto bg-muted/20">
+              {!selectedConversationId ? (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  <div className="text-center">
+                    <p className="text-lg font-medium mb-2">No conversation selected</p>
+                    <p className="text-sm">
+                      Create or select a conversation to start chatting
+                    </p>
+                  </div>
+                </div>
+              ) : messages.length === 0 && !streamingMessage ? (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  <div className="text-center">
+                    <p className="text-lg font-medium mb-2">No messages yet</p>
+                    <p className="text-sm">Start by asking a question below</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {messages.map((message, index) => {
+                    // Find tool messages that follow this assistant message
+                    const toolMessages: typeof messages = []
+                    if (message.role === 'assistant') {
+                      for (let i = index + 1; i < messages.length; i++) {
+                        if (messages[i].role === 'tool') {
+                          toolMessages.push(messages[i])
+                        } else {
+                          break
+                        }
+                      }
+                    }
+                    
+                    return (
+                      <ChatMessage
+                        key={message.id}
+                        message={{
+                          id: message.id,
+                          role: message.role,
+                          content: message.content,
+                          timestamp: new Date(message.created_at),
+                          tool_call_id: message.tool_call_id,
+                          raw_message: message.raw_message,
+                        }}
+                        toolMessages={toolMessages.map(tm => ({
+                          id: tm.id,
+                          role: tm.role,
+                          content: tm.content,
+                          timestamp: new Date(tm.created_at),
+                          tool_call_id: tm.tool_call_id,
+                          raw_message: tm.raw_message,
+                        }))}
+                      />
+                    )
+                  })}
+                  {/* Show pending user message */}
+                  {pendingUserMessage && (
+                    <ChatMessage
+                      message={{
+                        id: 'pending-user',
+                        role: 'user',
+                        content: pendingUserMessage,
+                        timestamp: new Date(),
+                        tool_call_id: null,
+                        raw_message: {},
+                      }}
+                    />
+                  )}
+                  {/* Show streaming AI response */}
+                  {(streamingMessage || streamingToolCalls.length > 0) && (
+                    <StreamingMessage 
+                      content={streamingMessage}
+                      toolCalls={streamingToolCalls}
+                    />
+                  )}
+                  <div ref={messagesEndRef} />
+                </>
+              )}
+            </div>
+
+            {/* Input */}
+            <ChatInput
+              onSubmit={handleSubmit}
+              isLoading={isStreaming}
+              disabled={!selectedConversationId}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Conversation</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this conversation? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
