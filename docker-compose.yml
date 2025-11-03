@@ -78,4 +78,3 @@ services:
 
 volumes:
   postgres_data:
-  qdrant_data:  # Persistent vector storage
