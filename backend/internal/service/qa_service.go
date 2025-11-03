@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	"smart-company-discovery/internal/clients"
 	"smart-company-discovery/internal/models"
 	"smart-company-discovery/internal/repository"
+
+	"github.com/google/uuid"
 )
 
 // QAService defines Q&A business logic operations
@@ -23,31 +24,45 @@ type QAService interface {
 	CreateQAWithEmbedding(ctx context.Context, req models.CreateQAWithEmbeddingRequest) (*models.QAPair, error)
 	UpdateQAWithEmbedding(ctx context.Context, req models.UpdateQAWithEmbeddingRequest) (*models.QAPair, error)
 	DeleteQAWithEmbedding(ctx context.Context, id uuid.UUID) (*models.DeleteQAResponse, error)
+	SearchSimilarByText(ctx context.Context, query string, topK int) ([]models.SimilarityMatch, error)
 }
 
 type qaService struct {
-	qaRepo   repository.QARepository
-	pinecone clients.PineconeClient
+	qaRepo           repository.QARepository
+	pinecone         clients.PineconeClient
+	embeddingService EmbeddingService
 }
 
 // NewQAService creates a new QA service
-func NewQAService(qaRepo repository.QARepository, pinecone clients.PineconeClient) QAService {
+func NewQAService(qaRepo repository.QARepository, pinecone clients.PineconeClient, embeddingService EmbeddingService) QAService {
 	return &qaService{
-		qaRepo:   qaRepo,
-		pinecone: pinecone,
+		qaRepo:           qaRepo,
+		pinecone:         pinecone,
+		embeddingService: embeddingService,
 	}
 }
 
-// CreateQA creates a new Q&A pair (without embedding)
+// CreateQA creates a new Q&A pair with automatic embedding and indexing
 func (s *qaService) CreateQA(ctx context.Context, req models.CreateQARequest) (*models.QAPair, error) {
 	qa := &models.QAPair{
 		Question: req.Question,
 		Answer:   req.Answer,
 	}
 
+	// Create in database first
 	err := s.qaRepo.Create(ctx, qa)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Q&A: %w", err)
+	}
+
+	// Index in Pinecone (incremental indexing)
+	if s.embeddingService != nil {
+		err = s.embeddingService.IndexQAPair(ctx, qa)
+		if err != nil {
+			// Log the error but don't fail the operation
+			// The Q&A pair is still created in the database
+			fmt.Printf("Warning: failed to index Q&A pair %s: %v\n", qa.ID, err)
+		}
 	}
 
 	return qa, nil
@@ -65,7 +80,7 @@ func (s *qaService) GetQA(ctx context.Context, id uuid.UUID) (*models.QAPair, er
 	return qa, nil
 }
 
-// UpdateQA updates an existing Q&A pair
+// UpdateQA updates an existing Q&A pair with automatic reindexing
 func (s *qaService) UpdateQA(ctx context.Context, id uuid.UUID, req models.UpdateQARequest) (*models.QAPair, error) {
 	existing, err := s.qaRepo.GetByID(ctx, id)
 	if err != nil {
@@ -78,20 +93,41 @@ func (s *qaService) UpdateQA(ctx context.Context, id uuid.UUID, req models.Updat
 	existing.Question = req.Question
 	existing.Answer = req.Answer
 
+	// Update in database
 	err = s.qaRepo.Update(ctx, existing)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update Q&A: %w", err)
 	}
 
+	// Reindex in Pinecone (incremental indexing)
+	if s.embeddingService != nil {
+		err = s.embeddingService.IndexQAPair(ctx, existing)
+		if err != nil {
+			// Log the error but don't fail the operation
+			fmt.Printf("Warning: failed to reindex Q&A pair %s: %v\n", existing.ID, err)
+		}
+	}
+
 	return existing, nil
 }
 
-// DeleteQA deletes a Q&A pair
+// DeleteQA deletes a Q&A pair with automatic index removal
 func (s *qaService) DeleteQA(ctx context.Context, id uuid.UUID) error {
+	// Delete from database
 	err := s.qaRepo.Delete(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete Q&A: %w", err)
 	}
+
+	// Remove from Pinecone index (incremental indexing)
+	if s.embeddingService != nil {
+		err = s.embeddingService.RemoveQAPairIndex(ctx, id)
+		if err != nil {
+			// Log the error but don't fail the operation
+			fmt.Printf("Warning: failed to remove Q&A pair %s from index: %v\n", id, err)
+		}
+	}
+
 	return nil
 }
 
@@ -213,14 +249,65 @@ func (s *qaService) DeleteQAWithEmbedding(ctx context.Context, id uuid.UUID) (*m
 	}
 	response.DeletedFromDB = true
 
-	err = s.pinecone.Delete(ctx, id.String())
-	if err != nil {
-		response.DeletedFromPinecone = false
+	if s.embeddingService != nil {
+		err = s.embeddingService.RemoveQAPairIndex(ctx, id)
+		if err != nil {
+			response.DeletedFromPinecone = false
+		} else {
+			response.DeletedFromPinecone = true
+		}
 	} else {
-		response.DeletedFromPinecone = true
+		err = s.pinecone.Delete(ctx, id.String())
+		if err != nil {
+			response.DeletedFromPinecone = false
+		} else {
+			response.DeletedFromPinecone = true
+		}
 	}
 
 	response.Success = response.DeletedFromDB
 	return response, nil
 }
 
+// SearchSimilarByText searches for similar Q&A pairs using text query
+func (s *qaService) SearchSimilarByText(ctx context.Context, query string, topK int) ([]models.SimilarityMatch, error) {
+	if s.embeddingService == nil {
+		return nil, fmt.Errorf("embedding service not configured")
+	}
+
+	// Use embedding service to search
+	matches, err := s.embeddingService.SearchSimilar(ctx, query, topK)
+	if err != nil {
+		return nil, fmt.Errorf("similarity search failed: %w", err)
+	}
+
+	// Extract IDs and scores
+	ids := make([]uuid.UUID, 0, len(matches))
+	scoreMap := make(map[uuid.UUID]float32)
+
+	for _, match := range matches {
+		id, err := uuid.Parse(match.ID)
+		if err != nil {
+			continue
+		}
+		ids = append(ids, id)
+		scoreMap[id] = match.Score
+	}
+
+	// Fetch Q&A pairs from database
+	qaPairs, err := s.qaRepo.GetByIDs(ctx, ids)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch Q&A pairs: %w", err)
+	}
+
+	// Build result with scores
+	results := make([]models.SimilarityMatch, 0, len(qaPairs))
+	for _, qa := range qaPairs {
+		results = append(results, models.SimilarityMatch{
+			QAPair: *qa,
+			Score:  scoreMap[qa.ID],
+		})
+	}
+
+	return results, nil
+}

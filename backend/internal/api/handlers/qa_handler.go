@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
+
+	"smart-company-discovery/internal/models"
+	"smart-company-discovery/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"smart-company-discovery/internal/models"
-	"smart-company-discovery/internal/service"
 )
 
 type QAHandler struct {
@@ -21,7 +23,14 @@ func NewQAHandler(qaService service.QAService) *QAHandler {
 func (h *QAHandler) CreateQA(c *gin.Context) {
 	var req models.CreateQARequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		// Simplify error message for validation failures
+		errMsg := "invalid input"
+		if req.Question == "" {
+			errMsg = "question is required"
+		} else if req.Answer == "" {
+			errMsg = "answer is required"
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
 		return
 	}
 
@@ -49,7 +58,7 @@ func (h *QAHandler) GetQA(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, qa)
+	c.JSON(http.StatusOK, gin.H{"qa_pair": qa})
 }
 
 // ListQA handles listing Q&A pairs with pagination
@@ -104,6 +113,12 @@ func (h *QAHandler) UpdateQA(c *gin.Context) {
 
 	qa, err := h.qaService.UpdateQA(c.Request.Context(), id, req)
 	if err != nil {
+		// Check if it's a not found error
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "no rows") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "QA pair not found"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -122,11 +137,17 @@ func (h *QAHandler) DeleteQA(c *gin.Context) {
 
 	err = h.qaService.DeleteQA(c.Request.Context(), id)
 	if err != nil {
+		// Check if it's a not found error
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "no rows") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "QA pair not found"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"success": true})
+	c.JSON(http.StatusOK, gin.H{"message": "QA pair deleted successfully"})
 }
 
 // Helper function to convert pointer slice to value slice
@@ -137,4 +158,3 @@ func convertQAPairPointers(ptrs []*models.QAPair) []models.QAPair {
 	}
 	return result
 }
-

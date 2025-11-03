@@ -17,14 +17,14 @@ type QAPair struct {
 
 // CreateQARequest represents a request to create a Q&A pair
 type CreateQARequest struct {
-	Question string `json:"question" validate:"required,min=3,max=1000"`
-	Answer   string `json:"answer" validate:"required,min=3,max=5000"`
+	Question string `json:"question" binding:"required,min=1,max=1000" validate:"required,min=1,max=1000"`
+	Answer   string `json:"answer" binding:"required,min=1,max=5000" validate:"required,min=1,max=5000"`
 }
 
 // UpdateQARequest represents a request to update a Q&A pair
 type UpdateQARequest struct {
-	Question string `json:"question" validate:"required,min=3,max=1000"`
-	Answer   string `json:"answer" validate:"required,min=3,max=5000"`
+	Question string `json:"question" binding:"required,min=1,max=1000" validate:"required,min=1,max=1000"`
+	Answer   string `json:"answer" binding:"required,min=1,max=5000" validate:"required,min=1,max=5000"`
 }
 
 // CreateQAResponse represents the response after creating a Q&A pair

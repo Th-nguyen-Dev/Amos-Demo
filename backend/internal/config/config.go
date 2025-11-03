@@ -26,6 +26,18 @@ func LoadConfig() (*models.Config, error) {
 			MaxOpenConns: getEnvAsInt("DB_MAX_OPEN_CONNS", 25),
 			MaxIdleConns: getEnvAsInt("DB_MAX_IDLE_CONNS", 5),
 		},
+		Pinecone: models.PineconeConfig{
+			APIKey:      getEnv("PINECONE_API_KEY", ""),
+			Environment: getEnv("PINECONE_ENVIRONMENT", ""),
+			IndexName:   getEnv("PINECONE_INDEX_NAME", ""),
+			Namespace:   getEnv("PINECONE_NAMESPACE", ""),
+		},
+		GoogleEmbedding: models.GoogleEmbeddingConfig{
+			APIKey:    getEnv("GOOGLE_API_KEY", ""),
+			ProjectID: getEnv("GOOGLE_PROJECT_ID", ""),
+			Location:  getEnv("GOOGLE_LOCATION", "us-central1"),
+			Model:     getEnv("GOOGLE_EMBEDDING_MODEL", "text-embedding-004"),
+		},
 	}
 
 	if err := validateConfig(config); err != nil {

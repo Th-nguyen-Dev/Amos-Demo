@@ -57,15 +57,56 @@ func main() {
 
 	log.Println("✓ Successfully connected to PostgreSQL database")
 
-	// Initialize Pinecone client (using mock)
-	pineconeClient := clients.NewMockPineconeClient()
+	// Initialize Google Embedding client
+	var embeddingClient clients.EmbeddingClient
+	if cfg.GoogleEmbedding.APIKey != "" && cfg.GoogleEmbedding.ProjectID != "" {
+		embClient, err := clients.NewGoogleEmbeddingClient(context.Background(), clients.GoogleEmbeddingConfig{
+			APIKey:    cfg.GoogleEmbedding.APIKey,
+			ProjectID: cfg.GoogleEmbedding.ProjectID,
+			Location:  cfg.GoogleEmbedding.Location,
+			Model:     cfg.GoogleEmbedding.Model,
+		})
+		if err != nil {
+			log.Printf("Warning: Failed to initialize Google Embedding client: %v. Using mock client.", err)
+			embeddingClient = clients.NewMockEmbeddingClient(768)
+		} else {
+			embeddingClient = embClient
+			log.Println("✓ Successfully initialized Google Embedding client")
+		}
+	} else {
+		log.Println("ℹ Google Embedding not configured. Using mock embedding client.")
+		embeddingClient = clients.NewMockEmbeddingClient(768)
+	}
+
+	// Initialize Pinecone client
+	var pineconeClient clients.PineconeClient
+	if cfg.Pinecone.APIKey != "" && cfg.Pinecone.IndexName != "" && cfg.Pinecone.Environment != "" {
+		pineconeClient, err = clients.NewPineconeClient(clients.PineconeConfig{
+			APIKey:      cfg.Pinecone.APIKey,
+			Environment: cfg.Pinecone.Environment,
+			IndexName:   cfg.Pinecone.IndexName,
+			Namespace:   cfg.Pinecone.Namespace,
+		})
+		if err != nil {
+			log.Printf("Warning: Failed to initialize Pinecone client: %v. Using mock client.", err)
+			pineconeClient = clients.NewMockPineconeClient()
+		} else {
+			log.Println("✓ Successfully initialized Pinecone client")
+		}
+	} else {
+		log.Println("ℹ Pinecone not configured. Using mock Pinecone client.")
+		pineconeClient = clients.NewMockPineconeClient()
+	}
+
+	// Initialize embedding service
+	embeddingService := service.NewEmbeddingService(embeddingClient, pineconeClient)
 
 	// Initialize repositories
 	qaRepo := repository.NewQARepository(db)
 	convRepo := repository.NewConversationRepository(db)
 
 	// Initialize services
-	qaService := service.NewQAService(qaRepo, pineconeClient)
+	qaService := service.NewQAService(qaRepo, pineconeClient, embeddingService)
 	convService := service.NewConversationService(convRepo)
 
 	// Initialize handlers

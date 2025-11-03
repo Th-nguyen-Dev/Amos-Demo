@@ -4,8 +4,10 @@ import "fmt"
 
 // Config represents the application configuration
 type Config struct {
-	Server   ServerConfig   `mapstructure:"server"`
-	Database DatabaseConfig `mapstructure:"database"`
+	Server        ServerConfig        `mapstructure:"server"`
+	Database      DatabaseConfig      `mapstructure:"database"`
+	Pinecone      PineconeConfig      `mapstructure:"pinecone"`
+	GoogleEmbedding GoogleEmbeddingConfig `mapstructure:"google_embedding"`
 }
 
 // ServerConfig represents HTTP server configuration
@@ -33,4 +35,20 @@ func (c DatabaseConfig) ConnectionString() string {
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		c.Host, c.Port, c.User, c.Password, c.DBName, c.SSLMode,
 	)
+}
+
+// PineconeConfig represents Pinecone vector database configuration
+type PineconeConfig struct {
+	APIKey      string `mapstructure:"api_key" validate:"required"`
+	Environment string `mapstructure:"environment" validate:"required"`
+	IndexName   string `mapstructure:"index_name" validate:"required"`
+	Namespace   string `mapstructure:"namespace"`
+}
+
+// GoogleEmbeddingConfig represents Google Embedding API configuration
+type GoogleEmbeddingConfig struct {
+	APIKey    string `mapstructure:"api_key" validate:"required"`
+	ProjectID string `mapstructure:"project_id" validate:"required"`
+	Location  string `mapstructure:"location"`
+	Model     string `mapstructure:"model"`
 }

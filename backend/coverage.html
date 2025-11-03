@@ -1,0 +1,2183 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>handlers: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">smart-company-discovery/internal/api/handlers/conversation_handler.go (68.4%)</option>
+				
+				<option value="file1">smart-company-discovery/internal/api/handlers/qa_handler.go (79.2%)</option>
+				
+				<option value="file2">smart-company-discovery/internal/clients/google_embedding.go (0.0%)</option>
+				
+				<option value="file3">smart-company-discovery/internal/clients/pinecone_client.go (0.0%)</option>
+				
+				<option value="file4">smart-company-discovery/internal/clients/pinecone_mock.go (5.3%)</option>
+				
+				<option value="file5">smart-company-discovery/internal/models/config.go (0.0%)</option>
+				
+				<option value="file6">smart-company-discovery/internal/models/error.go (0.0%)</option>
+				
+				<option value="file7">smart-company-discovery/internal/models/pagination.go (0.0%)</option>
+				
+				<option value="file8">smart-company-discovery/internal/repository/conversation_repository.go (77.0%)</option>
+				
+				<option value="file9">smart-company-discovery/internal/repository/qa_repository.go (70.4%)</option>
+				
+				<option value="file10">smart-company-discovery/internal/service/conversation_service.go (82.1%)</option>
+				
+				<option value="file11">smart-company-discovery/internal/service/embedding_service.go (0.0%)</option>
+				
+				<option value="file12">smart-company-discovery/internal/service/qa_service.go (23.3%)</option>
+				
+				<option value="file13">smart-company-discovery/internal/testutil/db.go (83.3%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">no coverage</span>
+				<span class="cov1">low coverage</span>
+				<span class="cov2">*</span>
+				<span class="cov3">*</span>
+				<span class="cov4">*</span>
+				<span class="cov5">*</span>
+				<span class="cov6">*</span>
+				<span class="cov7">*</span>
+				<span class="cov8">*</span>
+				<span class="cov9">*</span>
+				<span class="cov10">high coverage</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package handlers
+
+import (
+        "net/http"
+
+        "github.com/gin-gonic/gin"
+        "github.com/google/uuid"
+        "smart-company-discovery/internal/models"
+        "smart-company-discovery/internal/service"
+)
+
+type ConversationHandler struct {
+        convService service.ConversationService
+}
+
+func NewConversationHandler(convService service.ConversationService) *ConversationHandler <span class="cov6" title="6">{
+        return &amp;ConversationHandler{convService: convService}
+}</span>
+
+// CreateConversation handles creating a new conversation
+func (h *ConversationHandler) CreateConversation(c *gin.Context) <span class="cov7" title="7">{
+        var req models.CreateConversationRequest
+        if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        <span class="cov7" title="7">conv, err := h.convService.CreateConversation(c.Request.Context(), req.Title)
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        <span class="cov7" title="7">c.JSON(http.StatusCreated, models.CreateConversationResponse{Conversation: *conv})</span>
+}
+
+// GetConversation handles retrieving a conversation by ID
+func (h *ConversationHandler) GetConversation(c *gin.Context) <span class="cov3" title="2">{
+        idStr := c.Param("id")
+        id, err := uuid.Parse(idStr)
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid UUID"})
+                return
+        }</span>
+
+        <span class="cov3" title="2">conv, err := h.convService.GetConversation(c.Request.Context(), id)
+        if err != nil </span><span class="cov1" title="1">{
+                c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        <span class="cov1" title="1">c.JSON(http.StatusOK, conv)</span>
+}
+
+// ListConversations handles listing conversations with pagination
+func (h *ConversationHandler) ListConversations(c *gin.Context) <span class="cov1" title="1">{
+        var params models.CursorParams
+        if err := c.ShouldBindQuery(&amp;params); err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        <span class="cov1" title="1">convs, pagination, err := h.convService.ListConversations(c.Request.Context(), params)
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        <span class="cov1" title="1">c.JSON(http.StatusOK, models.ListConversationsResponse{
+                Data:       convertConversationPointers(convs),
+                Pagination: *pagination,
+        })</span>
+}
+
+// DeleteConversation handles deleting a conversation
+func (h *ConversationHandler) DeleteConversation(c *gin.Context) <span class="cov1" title="1">{
+        idStr := c.Param("id")
+        id, err := uuid.Parse(idStr)
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid UUID"})
+                return
+        }</span>
+
+        <span class="cov1" title="1">err = h.convService.DeleteConversation(c.Request.Context(), id)
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        <span class="cov1" title="1">c.JSON(http.StatusOK, gin.H{"success": true})</span>
+}
+
+// AddMessage handles adding a message to a conversation
+func (h *ConversationHandler) AddMessage(c *gin.Context) <span class="cov10" title="16">{
+        idStr := c.Param("id")
+        id, err := uuid.Parse(idStr)
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid UUID"})
+                return
+        }</span>
+
+        <span class="cov10" title="16">var req models.CreateMessageRequest
+        if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        <span class="cov10" title="16">req.ConversationID = id
+
+        msg, err := h.convService.AddMessage(c.Request.Context(), req)
+        if err != nil </span><span class="cov1" title="1">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        <span class="cov9" title="15">c.JSON(http.StatusCreated, models.CreateMessageResponse{Message: *msg})</span>
+}
+
+// GetMessages handles retrieving messages for a conversation
+func (h *ConversationHandler) GetMessages(c *gin.Context) <span class="cov7" title="7">{
+        idStr := c.Param("id")
+        id, err := uuid.Parse(idStr)
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid UUID"})
+                return
+        }</span>
+
+        <span class="cov7" title="7">var params models.CursorParams
+        if err := c.ShouldBindQuery(&amp;params); err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        <span class="cov7" title="7">msgs, pagination, err := h.convService.GetMessages(c.Request.Context(), id, params)
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        <span class="cov7" title="7">c.JSON(http.StatusOK, models.ListMessagesResponse{
+                Data:       convertMessagePointers(msgs),
+                Pagination: *pagination,
+        })</span>
+}
+
+// Helper functions
+func convertConversationPointers(ptrs []*models.Conversation) []models.Conversation <span class="cov1" title="1">{
+        result := make([]models.Conversation, len(ptrs))
+        for i, ptr := range ptrs </span><span class="cov5" title="4">{
+                result[i] = *ptr
+        }</span>
+        <span class="cov1" title="1">return result</span>
+}
+
+func convertMessagePointers(ptrs []*models.Message) []models.Message <span class="cov7" title="7">{
+        result := make([]models.Message, len(ptrs))
+        for i, ptr := range ptrs </span><span class="cov8" title="10">{
+                result[i] = *ptr
+        }</span>
+        <span class="cov7" title="7">return result</span>
+}
+
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package handlers
+
+import (
+        "net/http"
+        "strings"
+
+        "smart-company-discovery/internal/models"
+        "smart-company-discovery/internal/service"
+
+        "github.com/gin-gonic/gin"
+        "github.com/google/uuid"
+)
+
+type QAHandler struct {
+        qaService service.QAService
+}
+
+func NewQAHandler(qaService service.QAService) *QAHandler <span class="cov6" title="10">{
+        return &amp;QAHandler{qaService: qaService}
+}</span>
+
+// CreateQA handles creating a new Q&amp;A pair
+func (h *QAHandler) CreateQA(c *gin.Context) <span class="cov7" title="22">{
+        var req models.CreateQARequest
+        if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov2" title="2">{
+                // Simplify error message for validation failures
+                errMsg := "invalid input"
+                if req.Question == "" </span><span class="cov1" title="1">{
+                        errMsg = "question is required"
+                }</span> else<span class="cov1" title="1"> if req.Answer == "" </span><span class="cov1" title="1">{
+                        errMsg = "answer is required"
+                }</span>
+                <span class="cov2" title="2">c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
+                return</span>
+        }
+
+        <span class="cov7" title="20">qa, err := h.qaService.CreateQA(c.Request.Context(), req)
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        <span class="cov7" title="20">c.JSON(http.StatusCreated, models.CreateQAResponse{QAPair: *qa})</span>
+}
+
+// GetQA handles retrieving a Q&amp;A pair by ID
+func (h *QAHandler) GetQA(c *gin.Context) <span class="cov6" title="11">{
+        idStr := c.Param("id")
+        id, err := uuid.Parse(idStr)
+        if err != nil </span><span class="cov1" title="1">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid UUID"})
+                return
+        }</span>
+
+        <span class="cov6" title="10">qa, err := h.qaService.GetQA(c.Request.Context(), id)
+        if err != nil </span><span class="cov2" title="2">{
+                c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        <span class="cov5" title="8">c.JSON(http.StatusOK, gin.H{"qa_pair": qa})</span>
+}
+
+// ListQA handles listing Q&amp;A pairs with pagination
+func (h *QAHandler) ListQA(c *gin.Context) <span class="cov6" title="11">{
+        var params models.CursorParams
+        if err := c.ShouldBindQuery(&amp;params); err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        // Handle search if provided
+        <span class="cov6" title="11">if params.Search != "" </span><span class="cov3" title="3">{
+                qaPairs, pagination, err := h.qaService.SearchQA(c.Request.Context(), params.Search, params)
+                if err != nil </span><span class="cov0" title="0">{
+                        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                        return
+                }</span>
+
+                <span class="cov3" title="3">c.JSON(http.StatusOK, models.ListQAResponse{
+                        Data:       convertQAPairPointers(qaPairs),
+                        Pagination: *pagination,
+                })
+                return</span>
+        }
+
+        <span class="cov5" title="8">qaPairs, pagination, err := h.qaService.ListQA(c.Request.Context(), params)
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        <span class="cov5" title="8">c.JSON(http.StatusOK, models.ListQAResponse{
+                Data:       convertQAPairPointers(qaPairs),
+                Pagination: *pagination,
+        })</span>
+}
+
+// UpdateQA handles updating a Q&amp;A pair
+func (h *QAHandler) UpdateQA(c *gin.Context) <span class="cov4" title="5">{
+        idStr := c.Param("id")
+        id, err := uuid.Parse(idStr)
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid UUID"})
+                return
+        }</span>
+
+        <span class="cov4" title="5">var req models.UpdateQARequest
+        if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        <span class="cov4" title="5">qa, err := h.qaService.UpdateQA(c.Request.Context(), id, req)
+        if err != nil </span><span class="cov1" title="1">{
+                // Check if it's a not found error
+                errMsg := err.Error()
+                if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "no rows") </span><span class="cov1" title="1">{
+                        c.JSON(http.StatusNotFound, gin.H{"error": "QA pair not found"})
+                        return
+                }</span>
+                <span class="cov0" title="0">c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                return</span>
+        }
+
+        <span class="cov4" title="4">c.JSON(http.StatusOK, models.UpdateQAResponse{QAPair: *qa})</span>
+}
+
+// DeleteQA handles deleting a Q&amp;A pair
+func (h *QAHandler) DeleteQA(c *gin.Context) <span class="cov4" title="4">{
+        idStr := c.Param("id")
+        id, err := uuid.Parse(idStr)
+        if err != nil </span><span class="cov1" title="1">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid UUID"})
+                return
+        }</span>
+
+        <span class="cov3" title="3">err = h.qaService.DeleteQA(c.Request.Context(), id)
+        if err != nil </span><span class="cov1" title="1">{
+                // Check if it's a not found error
+                errMsg := err.Error()
+                if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "no rows") </span><span class="cov1" title="1">{
+                        c.JSON(http.StatusNotFound, gin.H{"error": "QA pair not found"})
+                        return
+                }</span>
+                <span class="cov0" title="0">c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                return</span>
+        }
+
+        <span class="cov2" title="2">c.JSON(http.StatusOK, gin.H{"message": "QA pair deleted successfully"})</span>
+}
+
+// Helper function to convert pointer slice to value slice
+func convertQAPairPointers(ptrs []*models.QAPair) []models.QAPair <span class="cov6" title="11">{
+        result := make([]models.QAPair, len(ptrs))
+        for i, ptr := range ptrs </span><span class="cov10" title="59">{
+                result[i] = *ptr
+        }</span>
+        <span class="cov6" title="11">return result</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package clients
+
+import (
+        "context"
+        "fmt"
+
+        "google.golang.org/api/aiplatform/v1"
+        "google.golang.org/api/option"
+)
+
+// EmbeddingClient defines embedding generation operations
+type EmbeddingClient interface {
+        GenerateEmbedding(ctx context.Context, text string) ([]float32, error)
+        GenerateBatchEmbeddings(ctx context.Context, texts []string) ([][]float32, error)
+}
+
+// GoogleEmbeddingClient implements embedding generation using Google's text-embedding models
+type GoogleEmbeddingClient struct {
+        service   *aiplatform.Service
+        projectID string
+        location  string
+        model     string
+}
+
+// GoogleEmbeddingConfig holds configuration for Google Embedding client
+type GoogleEmbeddingConfig struct {
+        APIKey    string
+        ProjectID string
+        Location  string
+        Model     string
+}
+
+// NewGoogleEmbeddingClient creates a new Google Embedding client
+func NewGoogleEmbeddingClient(ctx context.Context, config GoogleEmbeddingConfig) (EmbeddingClient, error) <span class="cov0" title="0">{
+        if config.Model == "" </span><span class="cov0" title="0">{
+                config.Model = "text-embedding-004"
+        }</span>
+        <span class="cov0" title="0">if config.Location == "" </span><span class="cov0" title="0">{
+                config.Location = "us-central1"
+        }</span>
+
+        <span class="cov0" title="0">var opts []option.ClientOption
+        if config.APIKey != "" </span><span class="cov0" title="0">{
+                opts = append(opts, option.WithAPIKey(config.APIKey))
+        }</span>
+
+        <span class="cov0" title="0">service, err := aiplatform.NewService(ctx, opts...)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to create AI Platform service: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">return &amp;GoogleEmbeddingClient{
+                service:   service,
+                projectID: config.ProjectID,
+                location:  config.Location,
+                model:     config.Model,
+        }, nil</span>
+}
+
+// GenerateEmbedding generates an embedding for a single text
+func (c *GoogleEmbeddingClient) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) <span class="cov0" title="0">{
+        embeddings, err := c.GenerateBatchEmbeddings(ctx, []string{text})
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">if len(embeddings) == 0 </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("no embeddings returned")
+        }</span>
+        <span class="cov0" title="0">return embeddings[0], nil</span>
+}
+
+// GenerateBatchEmbeddings generates embeddings for multiple texts
+func (c *GoogleEmbeddingClient) GenerateBatchEmbeddings(ctx context.Context, texts []string) ([][]float32, error) <span class="cov0" title="0">{
+        if len(texts) == 0 </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("no texts provided")
+        }</span>
+
+        // Construct the endpoint
+        <span class="cov0" title="0">endpoint := fmt.Sprintf("projects/%s/locations/%s/publishers/google/models/%s",
+                c.projectID, c.location, c.model)
+
+        instances := make([]interface{}, len(texts))
+        for i, text := range texts </span><span class="cov0" title="0">{
+                instances[i] = &amp;aiplatform.GoogleCloudAiplatformV1Content{
+                        Parts: []*aiplatform.GoogleCloudAiplatformV1Part{
+                                {
+                                        Text: text,
+                                },
+                        },
+                }
+        }</span>
+
+        <span class="cov0" title="0">req := &amp;aiplatform.GoogleCloudAiplatformV1PredictRequest{
+                Instances: instances,
+        }
+
+        resp, err := c.service.Projects.Locations.Endpoints.Predict(endpoint, req).Context(ctx).Do()
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("embedding request failed: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">embeddings := make([][]float32, len(texts))
+        for i, prediction := range resp.Predictions </span><span class="cov0" title="0">{
+                if i &gt;= len(texts) </span><span class="cov0" title="0">{
+                        break</span>
+                }
+
+                // The prediction contains an object with "embeddings" field
+                <span class="cov0" title="0">predMap, ok := prediction.(map[string]interface{})
+                if !ok </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("unexpected prediction format")
+                }</span>
+
+                <span class="cov0" title="0">embeddingsObj, ok := predMap["embeddings"]
+                if !ok </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("no embeddings field in prediction")
+                }</span>
+
+                <span class="cov0" title="0">embeddingsMap, ok := embeddingsObj.(map[string]interface{})
+                if !ok </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("unexpected embeddings format")
+                }</span>
+
+                <span class="cov0" title="0">valuesObj, ok := embeddingsMap["values"]
+                if !ok </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("no values field in embeddings")
+                }</span>
+
+                <span class="cov0" title="0">valuesSlice, ok := valuesObj.([]interface{})
+                if !ok </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("unexpected values format")
+                }</span>
+
+                <span class="cov0" title="0">embedding := make([]float32, len(valuesSlice))
+                for j, val := range valuesSlice </span><span class="cov0" title="0">{
+                        floatVal, ok := val.(float64)
+                        if !ok </span><span class="cov0" title="0">{
+                                return nil, fmt.Errorf("unexpected value type at index %d", j)
+                        }</span>
+                        <span class="cov0" title="0">embedding[j] = float32(floatVal)</span>
+                }
+
+                <span class="cov0" title="0">embeddings[i] = embedding</span>
+        }
+
+        <span class="cov0" title="0">return embeddings, nil</span>
+}
+
+// MockEmbeddingClient is a mock implementation for testing
+type MockEmbeddingClient struct {
+        dimension int
+}
+
+// NewMockEmbeddingClient creates a new mock embedding client
+func NewMockEmbeddingClient(dimension int) EmbeddingClient <span class="cov0" title="0">{
+        if dimension &lt;= 0 </span><span class="cov0" title="0">{
+                dimension = 768 // Default dimension
+        }</span>
+        <span class="cov0" title="0">return &amp;MockEmbeddingClient{dimension: dimension}</span>
+}
+
+// GenerateEmbedding generates a mock embedding
+func (c *MockEmbeddingClient) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) <span class="cov0" title="0">{
+        // Generate a simple mock embedding based on text length
+        embedding := make([]float32, c.dimension)
+        for i := range embedding </span><span class="cov0" title="0">{
+                embedding[i] = float32(len(text)%100) / 100.0
+        }</span>
+        <span class="cov0" title="0">return embedding, nil</span>
+}
+
+// GenerateBatchEmbeddings generates mock embeddings for multiple texts
+func (c *MockEmbeddingClient) GenerateBatchEmbeddings(ctx context.Context, texts []string) ([][]float32, error) <span class="cov0" title="0">{
+        embeddings := make([][]float32, len(texts))
+        for i, text := range texts </span><span class="cov0" title="0">{
+                embedding, err := c.GenerateEmbedding(ctx, text)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+                <span class="cov0" title="0">embeddings[i] = embedding</span>
+        }
+        <span class="cov0" title="0">return embeddings, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package clients
+
+import (
+        "bytes"
+        "context"
+        "encoding/json"
+        "fmt"
+        "io"
+        "net/http"
+        "time"
+)
+
+// PineconeConfig holds configuration for Pinecone client
+type PineconeConfig struct {
+        APIKey      string
+        Environment string
+        IndexName   string
+        Namespace   string
+}
+
+// realPineconeClient implements PineconeClient using the Pinecone REST API
+type realPineconeClient struct {
+        apiKey      string
+        environment string
+        indexName   string
+        namespace   string
+        host        string
+        httpClient  *http.Client
+}
+
+// NewPineconeClient creates a new Pinecone client
+func NewPineconeClient(config PineconeConfig) (PineconeClient, error) <span class="cov0" title="0">{
+        if config.APIKey == "" </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("Pinecone API key is required")
+        }</span>
+        <span class="cov0" title="0">if config.IndexName == "" </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("Pinecone index name is required")
+        }</span>
+        <span class="cov0" title="0">if config.Environment == "" </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("Pinecone environment is required")
+        }</span>
+
+        // Construct the host URL for the index
+        <span class="cov0" title="0">host := fmt.Sprintf("https://%s-%s.svc.%s.pinecone.io",
+                config.IndexName, "default", config.Environment)
+
+        return &amp;realPineconeClient{
+                apiKey:      config.APIKey,
+                environment: config.Environment,
+                indexName:   config.IndexName,
+                namespace:   config.Namespace,
+                host:        host,
+                httpClient: &amp;http.Client{
+                        Timeout: 30 * time.Second,
+                },
+        }, nil</span>
+}
+
+// upsertRequest represents a Pinecone upsert request
+type upsertRequest struct {
+        Vectors   []vector `json:"vectors"`
+        Namespace string   `json:"namespace,omitempty"`
+}
+
+// vector represents a single vector in Pinecone
+type vector struct {
+        ID       string                 `json:"id"`
+        Values   []float32              `json:"values"`
+        Metadata map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// queryRequest represents a Pinecone query request
+type queryRequest struct {
+        Vector          []float32 `json:"vector"`
+        TopK            int       `json:"topK"`
+        IncludeMetadata bool      `json:"includeMetadata"`
+        IncludeValues   bool      `json:"includeValues"`
+        Namespace       string    `json:"namespace,omitempty"`
+}
+
+// queryResponse represents a Pinecone query response
+type queryResponse struct {
+        Matches []struct {
+                ID       string                 `json:"id"`
+                Score    float32                `json:"score"`
+                Values   []float32              `json:"values,omitempty"`
+                Metadata map[string]interface{} `json:"metadata,omitempty"`
+        } `json:"matches"`
+}
+
+// deleteRequest represents a Pinecone delete request
+type deleteRequest struct {
+        IDs       []string `json:"ids,omitempty"`
+        DeleteAll bool     `json:"deleteAll,omitempty"`
+        Namespace string   `json:"namespace,omitempty"`
+}
+
+// Upsert inserts or updates a vector in Pinecone
+func (c *realPineconeClient) Upsert(ctx context.Context, id string, values []float32, metadata map[string]interface{}) error <span class="cov0" title="0">{
+        req := upsertRequest{
+                Vectors: []vector{
+                        {
+                                ID:       id,
+                                Values:   values,
+                                Metadata: metadata,
+                        },
+                },
+                Namespace: c.namespace,
+        }
+
+        body, err := json.Marshal(req)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to marshal request: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">httpReq, err := http.NewRequestWithContext(ctx, "POST", c.host+"/vectors/upsert", bytes.NewBuffer(body))
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to create request: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">httpReq.Header.Set("Api-Key", c.apiKey)
+        httpReq.Header.Set("Content-Type", "application/json")
+
+        resp, err := c.httpClient.Do(httpReq)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("request failed: %w", err)
+        }</span>
+        <span class="cov0" title="0">defer resp.Body.Close()
+
+        if resp.StatusCode != http.StatusOK </span><span class="cov0" title="0">{
+                bodyBytes, _ := io.ReadAll(resp.Body)
+                return fmt.Errorf("upsert failed with status %d: %s", resp.StatusCode, string(bodyBytes))
+        }</span>
+
+        <span class="cov0" title="0">return nil</span>
+}
+
+// Query performs a similarity search in Pinecone
+func (c *realPineconeClient) Query(ctx context.Context, vector []float32, topK int) ([]PineconeMatch, error) <span class="cov0" title="0">{
+        req := queryRequest{
+                Vector:          vector,
+                TopK:            topK,
+                IncludeMetadata: true,
+                IncludeValues:   false,
+                Namespace:       c.namespace,
+        }
+
+        body, err := json.Marshal(req)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to marshal request: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">httpReq, err := http.NewRequestWithContext(ctx, "POST", c.host+"/query", bytes.NewBuffer(body))
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to create request: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">httpReq.Header.Set("Api-Key", c.apiKey)
+        httpReq.Header.Set("Content-Type", "application/json")
+
+        resp, err := c.httpClient.Do(httpReq)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("request failed: %w", err)
+        }</span>
+        <span class="cov0" title="0">defer resp.Body.Close()
+
+        if resp.StatusCode != http.StatusOK </span><span class="cov0" title="0">{
+                bodyBytes, _ := io.ReadAll(resp.Body)
+                return nil, fmt.Errorf("query failed with status %d: %s", resp.StatusCode, string(bodyBytes))
+        }</span>
+
+        <span class="cov0" title="0">var queryResp queryResponse
+        if err := json.NewDecoder(resp.Body).Decode(&amp;queryResp); err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to decode response: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">matches := make([]PineconeMatch, len(queryResp.Matches))
+        for i, match := range queryResp.Matches </span><span class="cov0" title="0">{
+                matches[i] = PineconeMatch{
+                        ID:       match.ID,
+                        Score:    match.Score,
+                        Metadata: match.Metadata,
+                }
+        }</span>
+
+        <span class="cov0" title="0">return matches, nil</span>
+}
+
+// Delete removes a vector from Pinecone
+func (c *realPineconeClient) Delete(ctx context.Context, id string) error <span class="cov0" title="0">{
+        req := deleteRequest{
+                IDs:       []string{id},
+                Namespace: c.namespace,
+        }
+
+        body, err := json.Marshal(req)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to marshal request: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">httpReq, err := http.NewRequestWithContext(ctx, "POST", c.host+"/vectors/delete", bytes.NewBuffer(body))
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to create request: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">httpReq.Header.Set("Api-Key", c.apiKey)
+        httpReq.Header.Set("Content-Type", "application/json")
+
+        resp, err := c.httpClient.Do(httpReq)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("request failed: %w", err)
+        }</span>
+        <span class="cov0" title="0">defer resp.Body.Close()
+
+        if resp.StatusCode != http.StatusOK </span><span class="cov0" title="0">{
+                bodyBytes, _ := io.ReadAll(resp.Body)
+                return fmt.Errorf("delete failed with status %d: %s", resp.StatusCode, string(bodyBytes))
+        }</span>
+
+        <span class="cov0" title="0">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package clients
+
+import (
+        "context"
+        "sync"
+)
+
+// PineconeMatch represents a similarity search result
+type PineconeMatch struct {
+        ID       string                 `json:"id"`
+        Score    float32                `json:"score"`
+        Metadata map[string]interface{} `json:"metadata"`
+}
+
+// PineconeClient defines vector database operations
+type PineconeClient interface {
+        Upsert(ctx context.Context, id string, vector []float32, metadata map[string]interface{}) error
+        Query(ctx context.Context, vector []float32, topK int) ([]PineconeMatch, error)
+        Delete(ctx context.Context, id string) error
+}
+
+// MockPineconeClient is a mock implementation for testing
+type MockPineconeClient struct {
+        vectors map[string][]float32
+        mu      sync.RWMutex
+}
+
+// NewMockPineconeClient creates a new mock Pinecone client
+func NewMockPineconeClient() PineconeClient <span class="cov10" title="10">{
+        return &amp;MockPineconeClient{
+                vectors: make(map[string][]float32),
+        }
+}</span>
+
+// Upsert inserts or updates a vector
+func (c *MockPineconeClient) Upsert(ctx context.Context, id string, vector []float32, metadata map[string]interface{}) error <span class="cov0" title="0">{
+        c.mu.Lock()
+        defer c.mu.Unlock()
+        c.vectors[id] = vector
+        return nil
+}</span>
+
+// Query performs similarity search (mock implementation returns random results)
+func (c *MockPineconeClient) Query(ctx context.Context, vector []float32, topK int) ([]PineconeMatch, error) <span class="cov0" title="0">{
+        c.mu.RLock()
+        defer c.mu.RUnlock()
+
+        matches := []PineconeMatch{}
+        count := 0
+        for id := range c.vectors </span><span class="cov0" title="0">{
+                if count &gt;= topK </span><span class="cov0" title="0">{
+                        break</span>
+                }
+                <span class="cov0" title="0">matches = append(matches, PineconeMatch{
+                        ID:    id,
+                        Score: 0.95 - float32(count)*0.05,
+                        Metadata: map[string]interface{}{
+                                "id": id,
+                        },
+                })
+                count++</span>
+        }
+        <span class="cov0" title="0">return matches, nil</span>
+}
+
+// Delete removes a vector
+func (c *MockPineconeClient) Delete(ctx context.Context, id string) error <span class="cov0" title="0">{
+        c.mu.Lock()
+        defer c.mu.Unlock()
+        delete(c.vectors, id)
+        return nil
+}</span>
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package models
+
+import "fmt"
+
+// Config represents the application configuration
+type Config struct {
+        Server        ServerConfig        `mapstructure:"server"`
+        Database      DatabaseConfig      `mapstructure:"database"`
+        Pinecone      PineconeConfig      `mapstructure:"pinecone"`
+        GoogleEmbedding GoogleEmbeddingConfig `mapstructure:"google_embedding"`
+}
+
+// ServerConfig represents HTTP server configuration
+type ServerConfig struct {
+        Port        int    `mapstructure:"port" validate:"required,min=1,max=65535"`
+        Host        string `mapstructure:"host"`
+        Environment string `mapstructure:"environment" validate:"required,oneof=development staging production"`
+}
+
+// DatabaseConfig represents PostgreSQL configuration
+type DatabaseConfig struct {
+        Host         string `mapstructure:"host" validate:"required"`
+        Port         int    `mapstructure:"port" validate:"required,min=1,max=65535"`
+        User         string `mapstructure:"user" validate:"required"`
+        Password     string `mapstructure:"password" validate:"required"`
+        DBName       string `mapstructure:"dbname" validate:"required"`
+        SSLMode      string `mapstructure:"sslmode" validate:"required,oneof=disable require verify-ca verify-full"`
+        MaxOpenConns int    `mapstructure:"max_open_conns" validate:"min=1"`
+        MaxIdleConns int    `mapstructure:"max_idle_conns" validate:"min=1"`
+}
+
+// ConnectionString builds PostgreSQL connection string
+func (c DatabaseConfig) ConnectionString() string <span class="cov0" title="0">{
+        return fmt.Sprintf(
+                "host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+                c.Host, c.Port, c.User, c.Password, c.DBName, c.SSLMode,
+        )
+}</span>
+
+// PineconeConfig represents Pinecone vector database configuration
+type PineconeConfig struct {
+        APIKey      string `mapstructure:"api_key" validate:"required"`
+        Environment string `mapstructure:"environment" validate:"required"`
+        IndexName   string `mapstructure:"index_name" validate:"required"`
+        Namespace   string `mapstructure:"namespace"`
+}
+
+// GoogleEmbeddingConfig represents Google Embedding API configuration
+type GoogleEmbeddingConfig struct {
+        APIKey    string `mapstructure:"api_key" validate:"required"`
+        ProjectID string `mapstructure:"project_id" validate:"required"`
+        Location  string `mapstructure:"location"`
+        Model     string `mapstructure:"model"`
+}
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">package models
+
+import "errors"
+
+// Error types
+var (
+        ErrNotFound     = errors.New("resource not found")
+        ErrValidation   = errors.New("validation error")
+        ErrDatabase     = errors.New("database error")
+        ErrPinecone     = errors.New("pinecone error")
+        ErrInternal     = errors.New("internal server error")
+        ErrUnauthorized = errors.New("unauthorized")
+        ErrForbidden    = errors.New("forbidden")
+        ErrBadRequest   = errors.New("bad request")
+        ErrConflict     = errors.New("conflict")
+)
+
+// Error codes
+const (
+        ErrCodeValidation    = "VALIDATION_ERROR"
+        ErrCodeNotFound      = "NOT_FOUND"
+        ErrCodeInternal      = "INTERNAL_ERROR"
+        ErrCodeDatabaseError = "DATABASE_ERROR"
+        ErrCodePineconeError = "PINECONE_ERROR"
+        ErrCodeUnauthorized  = "UNAUTHORIZED"
+        ErrCodeForbidden     = "FORBIDDEN"
+        ErrCodeBadRequest    = "BAD_REQUEST"
+)
+
+// ErrorResponse represents a standardized error response
+type ErrorResponse struct {
+        Error   string                 `json:"error"`
+        Code    string                 `json:"code"`
+        Message string                 `json:"message"`
+        Details map[string]interface{} `json:"details,omitempty"`
+}
+
+// ValidationError represents a field validation error
+type ValidationError struct {
+        Field   string `json:"field"`
+        Message string `json:"message"`
+}
+
+// NewErrorResponse creates a new error response
+func NewErrorResponse(code, message string, details map[string]interface{}) ErrorResponse <span class="cov0" title="0">{
+        return ErrorResponse{
+                Error:   "error",
+                Code:    code,
+                Message: message,
+                Details: details,
+        }
+}</span>
+
+</pre>
+		
+		<pre class="file" id="file7" style="display: none">package models
+
+// CursorParams represents cursor pagination parameters
+type CursorParams struct {
+        Limit     int    `form:"limit" validate:"min=1,max=100"`
+        Cursor    string `form:"cursor"`
+        Direction string `form:"direction" validate:"omitempty,oneof=next prev"`
+        Search    string `form:"search" validate:"omitempty,max=200"`
+}
+
+// CursorPagination represents cursor pagination metadata
+type CursorPagination struct {
+        NextCursor string `json:"next_cursor,omitempty"`
+        PrevCursor string `json:"prev_cursor,omitempty"`
+        HasNext    bool   `json:"has_next"`
+        HasPrev    bool   `json:"has_prev"`
+}
+
+// NewCursorParams creates default cursor params
+func NewCursorParams() CursorParams <span class="cov0" title="0">{
+        return CursorParams{
+                Limit:     50,
+                Direction: "next",
+        }
+}</span>
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">package repository
+
+import (
+        "context"
+        "database/sql"
+        "encoding/json"
+        "fmt"
+
+        "smart-company-discovery/internal/models"
+
+        "github.com/google/uuid"
+        "github.com/jmoiron/sqlx"
+)
+
+// ConversationRepository defines conversation data access operations
+type ConversationRepository interface {
+        CreateConversation(ctx context.Context, conv *models.Conversation) error
+        GetConversation(ctx context.Context, id uuid.UUID) (*models.Conversation, error)
+        ListConversations(ctx context.Context, params models.CursorParams) ([]*models.Conversation, *models.CursorPagination, error)
+        DeleteConversation(ctx context.Context, id uuid.UUID) error
+        CreateMessage(ctx context.Context, msg *models.Message) error
+        GetMessages(ctx context.Context, conversationID uuid.UUID, params models.CursorParams) ([]*models.Message, *models.CursorPagination, error)
+}
+
+type conversationRepository struct {
+        db *sqlx.DB
+}
+
+// NewConversationRepository creates a new conversation repository
+func NewConversationRepository(db *sqlx.DB) ConversationRepository <span class="cov6" title="6">{
+        return &amp;conversationRepository{db: db}
+}</span>
+
+// CreateConversation creates a new conversation
+func (r *conversationRepository) CreateConversation(ctx context.Context, conv *models.Conversation) error <span class="cov7" title="7">{
+        var err error
+        conv.ID, err = uuid.NewV7()
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to generate UUID: %w", err)
+        }</span>
+
+        <span class="cov7" title="7">query := `
+                INSERT INTO conversations (id, title) 
+                VALUES ($1, $2)
+                RETURNING id, title, created_at, updated_at
+        `
+
+        return r.db.QueryRowxContext(ctx, query, conv.ID, conv.Title).StructScan(conv)</span>
+}
+
+// GetConversation retrieves a conversation by UUID
+func (r *conversationRepository) GetConversation(ctx context.Context, id uuid.UUID) (*models.Conversation, error) <span class="cov10" title="18">{
+        var conv models.Conversation
+
+        query := `SELECT id, title, created_at, updated_at FROM conversations WHERE id = $1`
+
+        err := r.db.GetContext(ctx, &amp;conv, query, id)
+        if err == sql.ErrNoRows </span><span class="cov3" title="2">{
+                return nil, nil
+        }</span>
+        <span class="cov9" title="16">return &amp;conv, err</span>
+}
+
+// ListConversations retrieves conversations with cursor pagination
+func (r *conversationRepository) ListConversations(ctx context.Context, params models.CursorParams) ([]*models.Conversation, *models.CursorPagination, error) <span class="cov1" title="1">{
+        if params.Limit &lt; 1 </span><span class="cov1" title="1">{
+                params.Limit = 20
+        }</span>
+        <span class="cov1" title="1">if params.Limit &gt; 100 </span><span class="cov0" title="0">{
+                params.Limit = 100
+        }</span>
+        <span class="cov1" title="1">if params.Direction == "" </span><span class="cov1" title="1">{
+                params.Direction = "next"
+        }</span>
+
+        <span class="cov1" title="1">whereClauses := []string{}
+        args := []interface{}{}
+
+        if params.Cursor != "" </span><span class="cov0" title="0">{
+                cursorID, err := uuid.Parse(params.Cursor)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, nil, fmt.Errorf("invalid cursor: %w", err)
+                }</span>
+
+                <span class="cov0" title="0">if params.Direction == "prev" </span><span class="cov0" title="0">{
+                        whereClauses = append(whereClauses, "created_at &gt; (SELECT created_at FROM conversations WHERE id = $1)")
+                }</span> else<span class="cov0" title="0"> {
+                        whereClauses = append(whereClauses, "created_at &lt; (SELECT created_at FROM conversations WHERE id = $1)")
+                }</span>
+                <span class="cov0" title="0">args = append(args, cursorID)</span>
+        }
+
+        <span class="cov1" title="1">whereSQL := ""
+        if len(whereClauses) &gt; 0 </span><span class="cov0" title="0">{
+                whereSQL = "WHERE " + whereClauses[0]
+        }</span>
+
+        <span class="cov1" title="1">order := "DESC"
+        if params.Direction == "prev" </span><span class="cov0" title="0">{
+                order = "ASC"
+        }</span>
+
+        <span class="cov1" title="1">fetchLimit := params.Limit + 1
+
+        query := fmt.Sprintf(`
+                SELECT id, title, created_at, updated_at
+                FROM conversations
+                %s
+                ORDER BY created_at %s
+                LIMIT $%d
+        `, whereSQL, order, len(args)+1)
+
+        args = append(args, fetchLimit)
+
+        var conversations []*models.Conversation
+        err := r.db.SelectContext(ctx, &amp;conversations, query, args...)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, nil, err
+        }</span>
+
+        <span class="cov1" title="1">hasMore := len(conversations) &gt; params.Limit
+        if hasMore </span><span class="cov0" title="0">{
+                conversations = conversations[:params.Limit]
+        }</span>
+
+        <span class="cov1" title="1">if params.Direction == "prev" </span><span class="cov0" title="0">{
+                for i, j := 0, len(conversations)-1; i &lt; j; i, j = i+1, j-1 </span><span class="cov0" title="0">{
+                        conversations[i], conversations[j] = conversations[j], conversations[i]
+                }</span>
+        }
+
+        <span class="cov1" title="1">pagination := &amp;models.CursorPagination{}
+
+        if len(conversations) &gt; 0 </span><span class="cov1" title="1">{
+                pagination.NextCursor = conversations[len(conversations)-1].ID.String()
+                pagination.PrevCursor = conversations[0].ID.String()
+                pagination.HasNext = hasMore
+                pagination.HasPrev = params.Cursor != ""
+        }</span>
+
+        <span class="cov1" title="1">return conversations, pagination, nil</span>
+}
+
+// DeleteConversation deletes a conversation
+func (r *conversationRepository) DeleteConversation(ctx context.Context, id uuid.UUID) error <span class="cov1" title="1">{
+        query := `DELETE FROM conversations WHERE id = $1`
+
+        result, err := r.db.ExecContext(ctx, query, id)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov1" title="1">rows, err := result.RowsAffected()
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov1" title="1">if rows == 0 </span><span class="cov0" title="0">{
+                return sql.ErrNoRows
+        }</span>
+
+        <span class="cov1" title="1">return nil</span>
+}
+
+// CreateMessage creates a new message
+func (r *conversationRepository) CreateMessage(ctx context.Context, msg *models.Message) error <span class="cov9" title="15">{
+        var err error
+        msg.ID, err = uuid.NewV7()
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to generate UUID: %w", err)
+        }</span>
+
+        // Convert raw_message to JSONB for PostgreSQL
+        <span class="cov9" title="15">rawMessageJSON, err := json.Marshal(msg.RawMessage)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to marshal raw_message: %w", err)
+        }</span>
+
+        <span class="cov9" title="15">query := `
+                INSERT INTO messages (id, conversation_id, role, content, tool_call_id, raw_message)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                RETURNING created_at
+        `
+
+        return r.db.QueryRowContext(ctx, query,
+                msg.ID, msg.ConversationID, msg.Role, msg.Content, msg.ToolCallID, rawMessageJSON).Scan(&amp;msg.CreatedAt)</span>
+}
+
+// GetMessages retrieves messages for a conversation
+func (r *conversationRepository) GetMessages(ctx context.Context, conversationID uuid.UUID, params models.CursorParams) ([]*models.Message, *models.CursorPagination, error) <span class="cov7" title="7">{
+        if params.Limit &lt; 1 </span><span class="cov5" title="4">{
+                params.Limit = 50
+        }</span>
+        <span class="cov7" title="7">if params.Limit &gt; 100 </span><span class="cov0" title="0">{
+                params.Limit = 100
+        }</span>
+        <span class="cov7" title="7">if params.Direction == "" </span><span class="cov7" title="7">{
+                params.Direction = "next"
+        }</span>
+
+        <span class="cov7" title="7">whereClauses := []string{"conversation_id = $1"}
+        args := []interface{}{conversationID}
+
+        if params.Cursor != "" </span><span class="cov1" title="1">{
+                cursorID, err := uuid.Parse(params.Cursor)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, nil, fmt.Errorf("invalid cursor: %w", err)
+                }</span>
+
+                <span class="cov1" title="1">if params.Direction == "prev" </span><span class="cov0" title="0">{
+                        whereClauses = append(whereClauses, "created_at &lt; (SELECT created_at FROM messages WHERE id = $2)")
+                }</span> else<span class="cov1" title="1"> {
+                        whereClauses = append(whereClauses, "created_at &gt; (SELECT created_at FROM messages WHERE id = $2)")
+                }</span>
+                <span class="cov1" title="1">args = append(args, cursorID)</span>
+        }
+
+        <span class="cov7" title="7">whereSQL := "WHERE " + whereClauses[0]
+        if len(whereClauses) &gt; 1 </span><span class="cov1" title="1">{
+                whereSQL += " AND " + whereClauses[1]
+        }</span>
+
+        <span class="cov7" title="7">order := "ASC"
+        if params.Direction == "prev" </span><span class="cov0" title="0">{
+                order = "DESC"
+        }</span>
+
+        <span class="cov7" title="7">fetchLimit := params.Limit + 1
+
+        query := fmt.Sprintf(`
+                SELECT id, conversation_id, role, content, tool_call_id, raw_message, created_at
+                FROM messages
+                %s
+                ORDER BY created_at %s
+                LIMIT $%d
+        `, whereSQL, order, len(args)+1)
+
+        args = append(args, fetchLimit)
+
+        rows, err := r.db.QueryxContext(ctx, query, args...)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, nil, err
+        }</span>
+        <span class="cov7" title="7">defer rows.Close()
+
+        var messages []*models.Message
+        for rows.Next() </span><span class="cov8" title="12">{
+                var msg models.Message
+                var rawMessageJSON []byte
+
+                err := rows.Scan(&amp;msg.ID, &amp;msg.ConversationID, &amp;msg.Role, &amp;msg.Content, &amp;msg.ToolCallID, &amp;rawMessageJSON, &amp;msg.CreatedAt)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, nil, err
+                }</span>
+
+                // Unmarshal raw_message from JSONB
+                <span class="cov8" title="12">if err := json.Unmarshal(rawMessageJSON, &amp;msg.RawMessage); err != nil </span><span class="cov0" title="0">{
+                        return nil, nil, fmt.Errorf("failed to unmarshal raw_message: %w", err)
+                }</span>
+
+                <span class="cov8" title="12">messages = append(messages, &amp;msg)</span>
+        }
+
+        <span class="cov7" title="7">hasMore := len(messages) &gt; params.Limit
+        if hasMore </span><span class="cov3" title="2">{
+                messages = messages[:params.Limit]
+        }</span>
+
+        <span class="cov7" title="7">if params.Direction == "prev" </span><span class="cov0" title="0">{
+                for i, j := 0, len(messages)-1; i &lt; j; i, j = i+1, j-1 </span><span class="cov0" title="0">{
+                        messages[i], messages[j] = messages[j], messages[i]
+                }</span>
+        }
+
+        <span class="cov7" title="7">pagination := &amp;models.CursorPagination{}
+
+        if len(messages) &gt; 0 </span><span class="cov6" title="5">{
+                pagination.NextCursor = messages[len(messages)-1].ID.String()
+                pagination.PrevCursor = messages[0].ID.String()
+                pagination.HasNext = hasMore
+                pagination.HasPrev = params.Cursor != ""
+        }</span>
+
+        <span class="cov7" title="7">return messages, pagination, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file9" style="display: none">package repository
+
+import (
+        "context"
+        "database/sql"
+        "fmt"
+
+        "smart-company-discovery/internal/models"
+
+        "github.com/google/uuid"
+        "github.com/jmoiron/sqlx"
+)
+
+// QARepository defines Q&amp;A data access operations
+type QARepository interface {
+        Create(ctx context.Context, qa *models.QAPair) error
+        GetByID(ctx context.Context, id uuid.UUID) (*models.QAPair, error)
+        GetByIDs(ctx context.Context, ids []uuid.UUID) ([]*models.QAPair, error)
+        Update(ctx context.Context, qa *models.QAPair) error
+        Delete(ctx context.Context, id uuid.UUID) error
+        List(ctx context.Context, params models.CursorParams) ([]*models.QAPair, *models.CursorPagination, error)
+        SearchFullText(ctx context.Context, query string, params models.CursorParams) ([]*models.QAPair, *models.CursorPagination, error)
+        Count(ctx context.Context) (int, error)
+}
+
+type qaRepository struct {
+        db *sqlx.DB
+}
+
+// NewQARepository creates a new QA repository
+func NewQARepository(db *sqlx.DB) QARepository <span class="cov7" title="10">{
+        return &amp;qaRepository{db: db}
+}</span>
+
+// Create creates a new Q&amp;A pair
+func (r *qaRepository) Create(ctx context.Context, qa *models.QAPair) error <span class="cov10" title="20">{
+        var err error
+        qa.ID, err = uuid.NewV7()
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to generate UUID: %w", err)
+        }</span>
+
+        <span class="cov10" title="20">query := `
+                INSERT INTO qa_pairs (id, question, answer) 
+                VALUES ($1, $2, $3)
+                RETURNING id, question, answer, created_at, updated_at
+        `
+
+        return r.db.QueryRowxContext(ctx, query, qa.ID, qa.Question, qa.Answer).StructScan(qa)</span>
+}
+
+// GetByID retrieves a Q&amp;A pair by UUID
+func (r *qaRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.QAPair, error) <span class="cov9" title="15">{
+        var qa models.QAPair
+
+        query := `SELECT id, question, answer, created_at, updated_at FROM qa_pairs WHERE id = $1`
+
+        err := r.db.GetContext(ctx, &amp;qa, query, id)
+        if err == sql.ErrNoRows </span><span class="cov4" title="3">{
+                return nil, nil
+        }</span>
+        <span class="cov8" title="12">return &amp;qa, err</span>
+}
+
+// GetByIDs retrieves multiple Q&amp;A pairs by UUIDs
+func (r *qaRepository) GetByIDs(ctx context.Context, ids []uuid.UUID) ([]*models.QAPair, error) <span class="cov0" title="0">{
+        if len(ids) == 0 </span><span class="cov0" title="0">{
+                return []*models.QAPair{}, nil
+        }</span>
+
+        // Convert UUIDs to strings
+        <span class="cov0" title="0">idStrs := make([]interface{}, len(ids))
+        for i, id := range ids </span><span class="cov0" title="0">{
+                idStrs[i] = id.String()
+        }</span>
+
+        // Build IN clause
+        <span class="cov0" title="0">query, args, err := sqlx.In("SELECT id, question, answer, created_at, updated_at FROM qa_pairs WHERE id IN (?) ORDER BY created_at DESC", idStrs)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">query = r.db.Rebind(query)
+        var qaPairs []*models.QAPair
+        err = r.db.SelectContext(ctx, &amp;qaPairs, query, args...)
+        return qaPairs, err</span>
+}
+
+// Update updates an existing Q&amp;A pair
+func (r *qaRepository) Update(ctx context.Context, qa *models.QAPair) error <span class="cov5" title="4">{
+        query := `
+                UPDATE qa_pairs 
+                SET question = $1, answer = $2 
+                WHERE id = $3
+                RETURNING id, question, answer, created_at, updated_at
+        `
+
+        return r.db.QueryRowxContext(ctx, query, qa.Question, qa.Answer, qa.ID).StructScan(qa)
+}</span>
+
+// Delete deletes a Q&amp;A pair
+func (r *qaRepository) Delete(ctx context.Context, id uuid.UUID) error <span class="cov4" title="3">{
+        query := `DELETE FROM qa_pairs WHERE id = $1`
+
+        result, err := r.db.ExecContext(ctx, query, id)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov4" title="3">rows, err := result.RowsAffected()
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov4" title="3">if rows == 0 </span><span class="cov1" title="1">{
+                return sql.ErrNoRows
+        }</span>
+
+        <span class="cov3" title="2">return nil</span>
+}
+
+// List retrieves Q&amp;A pairs with cursor pagination
+func (r *qaRepository) List(ctx context.Context, params models.CursorParams) ([]*models.QAPair, *models.CursorPagination, error) <span class="cov7" title="8">{
+        if params.Limit &lt; 1 </span><span class="cov5" title="5">{
+                params.Limit = 10
+        }</span>
+        <span class="cov7" title="8">if params.Limit &gt; 100 </span><span class="cov0" title="0">{
+                params.Limit = 100
+        }</span>
+        <span class="cov7" title="8">if params.Direction == "" </span><span class="cov7" title="8">{
+                params.Direction = "next"
+        }</span>
+
+        <span class="cov7" title="8">whereClauses := []string{}
+        args := []interface{}{}
+
+        if params.Cursor != "" </span><span class="cov1" title="1">{
+                cursorID, err := uuid.Parse(params.Cursor)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, nil, fmt.Errorf("invalid cursor: %w", err)
+                }</span>
+
+                <span class="cov1" title="1">if params.Direction == "prev" </span><span class="cov0" title="0">{
+                        whereClauses = append(whereClauses, "created_at &gt; (SELECT created_at FROM qa_pairs WHERE id = $1)")
+                }</span> else<span class="cov1" title="1"> {
+                        whereClauses = append(whereClauses, "created_at &lt; (SELECT created_at FROM qa_pairs WHERE id = $1)")
+                }</span>
+                <span class="cov1" title="1">args = append(args, cursorID)</span>
+        }
+
+        <span class="cov7" title="8">whereSQL := ""
+        if len(whereClauses) &gt; 0 </span><span class="cov1" title="1">{
+                whereSQL = "WHERE " + whereClauses[0]
+        }</span>
+
+        <span class="cov7" title="8">order := "DESC"
+        if params.Direction == "prev" </span><span class="cov0" title="0">{
+                order = "ASC"
+        }</span>
+
+        <span class="cov7" title="8">fetchLimit := params.Limit + 1
+
+        query := fmt.Sprintf(`
+                SELECT id, question, answer, created_at, updated_at
+                FROM qa_pairs
+                %s
+                ORDER BY created_at %s
+                LIMIT $%d
+        `, whereSQL, order, len(args)+1)
+
+        args = append(args, fetchLimit)
+
+        var qaPairs []*models.QAPair
+        err := r.db.SelectContext(ctx, &amp;qaPairs, query, args...)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, nil, err
+        }</span>
+
+        <span class="cov7" title="8">hasMore := len(qaPairs) &gt; params.Limit
+        if hasMore </span><span class="cov7" title="8">{
+                qaPairs = qaPairs[:params.Limit]
+        }</span>
+
+        <span class="cov7" title="8">if params.Direction == "prev" </span><span class="cov0" title="0">{
+                for i, j := 0, len(qaPairs)-1; i &lt; j; i, j = i+1, j-1 </span><span class="cov0" title="0">{
+                        qaPairs[i], qaPairs[j] = qaPairs[j], qaPairs[i]
+                }</span>
+        }
+
+        <span class="cov7" title="8">pagination := &amp;models.CursorPagination{}
+
+        if len(qaPairs) &gt; 0 </span><span class="cov7" title="8">{
+                pagination.NextCursor = qaPairs[len(qaPairs)-1].ID.String()
+                pagination.PrevCursor = qaPairs[0].ID.String()
+                pagination.HasNext = hasMore
+                pagination.HasPrev = params.Cursor != ""
+        }</span>
+
+        <span class="cov7" title="8">return qaPairs, pagination, nil</span>
+}
+
+// SearchFullText performs full-text search using PostgreSQL's built-in FTS
+func (r *qaRepository) SearchFullText(ctx context.Context, searchQuery string, params models.CursorParams) ([]*models.QAPair, *models.CursorPagination, error) <span class="cov4" title="3">{
+        if params.Limit &lt; 1 </span><span class="cov4" title="3">{
+                params.Limit = 10
+        }</span>
+        <span class="cov4" title="3">if params.Limit &gt; 100 </span><span class="cov0" title="0">{
+                params.Limit = 100
+        }</span>
+
+        // PostgreSQL full-text search with ranking
+        <span class="cov4" title="3">query := `
+                SELECT id, question, answer, created_at, updated_at
+                FROM qa_pairs
+                WHERE to_tsvector('english', question || ' ' || answer) @@ plainto_tsquery('english', $1)
+                ORDER BY ts_rank(to_tsvector('english', question || ' ' || answer), plainto_tsquery('english', $1)) DESC
+                LIMIT $2
+        `
+
+        fetchLimit := params.Limit + 1
+
+        var qaPairs []*models.QAPair
+        err := r.db.SelectContext(ctx, &amp;qaPairs, query, searchQuery, fetchLimit)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, nil, err
+        }</span>
+
+        <span class="cov4" title="3">hasMore := len(qaPairs) &gt; params.Limit
+        if hasMore </span><span class="cov0" title="0">{
+                qaPairs = qaPairs[:params.Limit]
+        }</span>
+
+        <span class="cov4" title="3">pagination := &amp;models.CursorPagination{
+                HasNext: hasMore,
+                HasPrev: false,
+        }
+
+        return qaPairs, pagination, nil</span>
+}
+
+// Count returns total count of Q&amp;A pairs
+func (r *qaRepository) Count(ctx context.Context) (int, error) <span class="cov0" title="0">{
+        var count int
+        query := `SELECT COUNT(*) FROM qa_pairs`
+        err := r.db.GetContext(ctx, &amp;count, query)
+        return count, err
+}</span>
+</pre>
+		
+		<pre class="file" id="file10" style="display: none">package service
+
+import (
+        "context"
+        "fmt"
+
+        "github.com/google/uuid"
+        "smart-company-discovery/internal/models"
+        "smart-company-discovery/internal/repository"
+)
+
+// ConversationService defines conversation business logic operations
+type ConversationService interface {
+        CreateConversation(ctx context.Context, title string) (*models.Conversation, error)
+        GetConversation(ctx context.Context, id uuid.UUID) (*models.Conversation, error)
+        ListConversations(ctx context.Context, params models.CursorParams) ([]*models.Conversation, *models.CursorPagination, error)
+        DeleteConversation(ctx context.Context, id uuid.UUID) error
+        AddMessage(ctx context.Context, req models.CreateMessageRequest) (*models.Message, error)
+        GetMessages(ctx context.Context, conversationID uuid.UUID, params models.CursorParams) ([]*models.Message, *models.CursorPagination, error)
+}
+
+type conversationService struct {
+        convRepo repository.ConversationRepository
+}
+
+// NewConversationService creates a new conversation service
+func NewConversationService(convRepo repository.ConversationRepository) ConversationService <span class="cov6" title="6">{
+        return &amp;conversationService{convRepo: convRepo}
+}</span>
+
+// CreateConversation creates a new conversation
+func (s *conversationService) CreateConversation(ctx context.Context, title string) (*models.Conversation, error) <span class="cov7" title="7">{
+        conv := &amp;models.Conversation{
+                Title: &amp;title,
+        }
+
+        err := s.convRepo.CreateConversation(ctx, conv)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to create conversation: %w", err)
+        }</span>
+
+        <span class="cov7" title="7">return conv, nil</span>
+}
+
+// GetConversation retrieves a conversation by UUID
+func (s *conversationService) GetConversation(ctx context.Context, id uuid.UUID) (*models.Conversation, error) <span class="cov3" title="2">{
+        conv, err := s.convRepo.GetConversation(ctx, id)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to get conversation: %w", err)
+        }</span>
+        <span class="cov3" title="2">if conv == nil </span><span class="cov1" title="1">{
+                return nil, fmt.Errorf("conversation not found")
+        }</span>
+        <span class="cov1" title="1">return conv, nil</span>
+}
+
+// ListConversations lists conversations with cursor pagination
+func (s *conversationService) ListConversations(ctx context.Context, params models.CursorParams) ([]*models.Conversation, *models.CursorPagination, error) <span class="cov1" title="1">{
+        return s.convRepo.ListConversations(ctx, params)
+}</span>
+
+// DeleteConversation deletes a conversation
+func (s *conversationService) DeleteConversation(ctx context.Context, id uuid.UUID) error <span class="cov1" title="1">{
+        err := s.convRepo.DeleteConversation(ctx, id)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to delete conversation: %w", err)
+        }</span>
+        <span class="cov1" title="1">return nil</span>
+}
+
+// AddMessage adds a message to a conversation
+func (s *conversationService) AddMessage(ctx context.Context, req models.CreateMessageRequest) (*models.Message, error) <span class="cov10" title="16">{
+        conv, err := s.convRepo.GetConversation(ctx, req.ConversationID)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to get conversation: %w", err)
+        }</span>
+        <span class="cov10" title="16">if conv == nil </span><span class="cov1" title="1">{
+                return nil, fmt.Errorf("conversation not found")
+        }</span>
+
+        <span class="cov9" title="15">msg := &amp;models.Message{
+                ConversationID: req.ConversationID,
+                Role:           req.Role,
+                Content:        req.Content,
+                ToolCallID:     req.ToolCallID,
+                RawMessage:     req.RawMessage,
+        }
+
+        err = s.convRepo.CreateMessage(ctx, msg)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to create message: %w", err)
+        }</span>
+
+        <span class="cov9" title="15">return msg, nil</span>
+}
+
+// GetMessages retrieves messages for a conversation
+func (s *conversationService) GetMessages(ctx context.Context, conversationID uuid.UUID, params models.CursorParams) ([]*models.Message, *models.CursorPagination, error) <span class="cov7" title="7">{
+        return s.convRepo.GetMessages(ctx, conversationID, params)
+}</span>
+
+</pre>
+		
+		<pre class="file" id="file11" style="display: none">package service
+
+import (
+        "context"
+        "fmt"
+
+        "github.com/google/uuid"
+        "smart-company-discovery/internal/clients"
+        "smart-company-discovery/internal/models"
+)
+
+// EmbeddingService handles embedding generation and indexing
+type EmbeddingService interface {
+        // IndexQAPair generates an embedding for a Q&amp;A pair and stores it in Pinecone
+        IndexQAPair(ctx context.Context, qa *models.QAPair) error
+
+        // RemoveQAPairIndex removes a Q&amp;A pair's embedding from Pinecone
+        RemoveQAPairIndex(ctx context.Context, id uuid.UUID) error
+
+        // GenerateEmbedding generates an embedding for a given text
+        GenerateEmbedding(ctx context.Context, text string) ([]float32, error)
+
+        // SearchSimilar searches for similar Q&amp;A pairs using embedding
+        SearchSimilar(ctx context.Context, queryText string, topK int) ([]clients.PineconeMatch, error)
+}
+
+type embeddingService struct {
+        embeddingClient clients.EmbeddingClient
+        pineconeClient  clients.PineconeClient
+}
+
+// NewEmbeddingService creates a new embedding service
+func NewEmbeddingService(embeddingClient clients.EmbeddingClient, pineconeClient clients.PineconeClient) EmbeddingService <span class="cov0" title="0">{
+        return &amp;embeddingService{
+                embeddingClient: embeddingClient,
+                pineconeClient:  pineconeClient,
+        }
+}</span>
+
+// IndexQAPair generates an embedding for a Q&amp;A pair and stores it in Pinecone
+func (s *embeddingService) IndexQAPair(ctx context.Context, qa *models.QAPair) error <span class="cov0" title="0">{
+        // Combine question and answer for embedding
+        // This allows the vector to capture the semantic meaning of both
+        text := fmt.Sprintf("Question: %s\nAnswer: %s", qa.Question, qa.Answer)
+
+        // Generate embedding
+        embedding, err := s.embeddingClient.GenerateEmbedding(ctx, text)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to generate embedding: %w", err)
+        }</span>
+
+        // Store in Pinecone with metadata
+        <span class="cov0" title="0">metadata := map[string]interface{}{
+                "id":         qa.ID.String(),
+                "question":   qa.Question,
+                "answer":     qa.Answer,
+                "created_at": qa.CreatedAt.Unix(),
+                "updated_at": qa.UpdatedAt.Unix(),
+        }
+
+        err = s.pineconeClient.Upsert(ctx, qa.ID.String(), embedding, metadata)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to upsert to Pinecone: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">return nil</span>
+}
+
+// RemoveQAPairIndex removes a Q&amp;A pair's embedding from Pinecone
+func (s *embeddingService) RemoveQAPairIndex(ctx context.Context, id uuid.UUID) error <span class="cov0" title="0">{
+        err := s.pineconeClient.Delete(ctx, id.String())
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to delete from Pinecone: %w", err)
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+// GenerateEmbedding generates an embedding for a given text
+func (s *embeddingService) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) <span class="cov0" title="0">{
+        embedding, err := s.embeddingClient.GenerateEmbedding(ctx, text)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to generate embedding: %w", err)
+        }</span>
+        <span class="cov0" title="0">return embedding, nil</span>
+}
+
+// SearchSimilar searches for similar Q&amp;A pairs using embedding
+func (s *embeddingService) SearchSimilar(ctx context.Context, queryText string, topK int) ([]clients.PineconeMatch, error) <span class="cov0" title="0">{
+        // Generate embedding for the query
+        embedding, err := s.embeddingClient.GenerateEmbedding(ctx, queryText)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to generate query embedding: %w", err)
+        }</span>
+
+        // Query Pinecone
+        <span class="cov0" title="0">matches, err := s.pineconeClient.Query(ctx, embedding, topK)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to query Pinecone: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">return matches, nil</span>
+}
+
+</pre>
+		
+		<pre class="file" id="file12" style="display: none">package service
+
+import (
+        "context"
+        "fmt"
+
+        "smart-company-discovery/internal/clients"
+        "smart-company-discovery/internal/models"
+        "smart-company-discovery/internal/repository"
+
+        "github.com/google/uuid"
+)
+
+// QAService defines Q&amp;A business logic operations
+type QAService interface {
+        CreateQA(ctx context.Context, req models.CreateQARequest) (*models.QAPair, error)
+        GetQA(ctx context.Context, id uuid.UUID) (*models.QAPair, error)
+        UpdateQA(ctx context.Context, id uuid.UUID, req models.UpdateQARequest) (*models.QAPair, error)
+        DeleteQA(ctx context.Context, id uuid.UUID) error
+        ListQA(ctx context.Context, params models.CursorParams) ([]*models.QAPair, *models.CursorPagination, error)
+        SearchQA(ctx context.Context, query string, params models.CursorParams) ([]*models.QAPair, *models.CursorPagination, error)
+        FindSimilar(ctx context.Context, embedding []float32, topK int) ([]models.SimilarityMatch, error)
+        GetQAByIDs(ctx context.Context, ids []uuid.UUID) ([]*models.QAPair, error)
+        CreateQAWithEmbedding(ctx context.Context, req models.CreateQAWithEmbeddingRequest) (*models.QAPair, error)
+        UpdateQAWithEmbedding(ctx context.Context, req models.UpdateQAWithEmbeddingRequest) (*models.QAPair, error)
+        DeleteQAWithEmbedding(ctx context.Context, id uuid.UUID) (*models.DeleteQAResponse, error)
+        SearchSimilarByText(ctx context.Context, query string, topK int) ([]models.SimilarityMatch, error)
+}
+
+type qaService struct {
+        qaRepo           repository.QARepository
+        pinecone         clients.PineconeClient
+        embeddingService EmbeddingService
+}
+
+// NewQAService creates a new QA service
+func NewQAService(qaRepo repository.QARepository, pinecone clients.PineconeClient, embeddingService EmbeddingService) QAService <span class="cov7" title="10">{
+        return &amp;qaService{
+                qaRepo:           qaRepo,
+                pinecone:         pinecone,
+                embeddingService: embeddingService,
+        }
+}</span>
+
+// CreateQA creates a new Q&amp;A pair with automatic embedding and indexing
+func (s *qaService) CreateQA(ctx context.Context, req models.CreateQARequest) (*models.QAPair, error) <span class="cov10" title="20">{
+        qa := &amp;models.QAPair{
+                Question: req.Question,
+                Answer:   req.Answer,
+        }
+
+        // Create in database first
+        err := s.qaRepo.Create(ctx, qa)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to create Q&amp;A: %w", err)
+        }</span>
+
+        // Index in Pinecone (incremental indexing)
+        <span class="cov10" title="20">if s.embeddingService != nil </span><span class="cov0" title="0">{
+                err = s.embeddingService.IndexQAPair(ctx, qa)
+                if err != nil </span><span class="cov0" title="0">{
+                        // Log the error but don't fail the operation
+                        // The Q&amp;A pair is still created in the database
+                        fmt.Printf("Warning: failed to index Q&amp;A pair %s: %v\n", qa.ID, err)
+                }</span>
+        }
+
+        <span class="cov10" title="20">return qa, nil</span>
+}
+
+// GetQA retrieves a Q&amp;A pair by UUID
+func (s *qaService) GetQA(ctx context.Context, id uuid.UUID) (*models.QAPair, error) <span class="cov7" title="10">{
+        qa, err := s.qaRepo.GetByID(ctx, id)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to get Q&amp;A: %w", err)
+        }</span>
+        <span class="cov7" title="10">if qa == nil </span><span class="cov3" title="2">{
+                return nil, fmt.Errorf("Q&amp;A not found")
+        }</span>
+        <span class="cov7" title="8">return qa, nil</span>
+}
+
+// UpdateQA updates an existing Q&amp;A pair with automatic reindexing
+func (s *qaService) UpdateQA(ctx context.Context, id uuid.UUID, req models.UpdateQARequest) (*models.QAPair, error) <span class="cov5" title="5">{
+        existing, err := s.qaRepo.GetByID(ctx, id)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to get Q&amp;A: %w", err)
+        }</span>
+        <span class="cov5" title="5">if existing == nil </span><span class="cov1" title="1">{
+                return nil, fmt.Errorf("Q&amp;A not found")
+        }</span>
+
+        <span class="cov5" title="4">existing.Question = req.Question
+        existing.Answer = req.Answer
+
+        // Update in database
+        err = s.qaRepo.Update(ctx, existing)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to update Q&amp;A: %w", err)
+        }</span>
+
+        // Reindex in Pinecone (incremental indexing)
+        <span class="cov5" title="4">if s.embeddingService != nil </span><span class="cov0" title="0">{
+                err = s.embeddingService.IndexQAPair(ctx, existing)
+                if err != nil </span><span class="cov0" title="0">{
+                        // Log the error but don't fail the operation
+                        fmt.Printf("Warning: failed to reindex Q&amp;A pair %s: %v\n", existing.ID, err)
+                }</span>
+        }
+
+        <span class="cov5" title="4">return existing, nil</span>
+}
+
+// DeleteQA deletes a Q&amp;A pair with automatic index removal
+func (s *qaService) DeleteQA(ctx context.Context, id uuid.UUID) error <span class="cov4" title="3">{
+        // Delete from database
+        err := s.qaRepo.Delete(ctx, id)
+        if err != nil </span><span class="cov1" title="1">{
+                return fmt.Errorf("failed to delete Q&amp;A: %w", err)
+        }</span>
+
+        // Remove from Pinecone index (incremental indexing)
+        <span class="cov3" title="2">if s.embeddingService != nil </span><span class="cov0" title="0">{
+                err = s.embeddingService.RemoveQAPairIndex(ctx, id)
+                if err != nil </span><span class="cov0" title="0">{
+                        // Log the error but don't fail the operation
+                        fmt.Printf("Warning: failed to remove Q&amp;A pair %s from index: %v\n", id, err)
+                }</span>
+        }
+
+        <span class="cov3" title="2">return nil</span>
+}
+
+// ListQA lists Q&amp;A pairs with cursor pagination
+func (s *qaService) ListQA(ctx context.Context, params models.CursorParams) ([]*models.QAPair, *models.CursorPagination, error) <span class="cov7" title="8">{
+        return s.qaRepo.List(ctx, params)
+}</span>
+
+// SearchQA performs full-text search
+func (s *qaService) SearchQA(ctx context.Context, query string, params models.CursorParams) ([]*models.QAPair, *models.CursorPagination, error) <span class="cov4" title="3">{
+        return s.qaRepo.SearchFullText(ctx, query, params)
+}</span>
+
+// FindSimilar finds similar Q&amp;A pairs using vector search
+func (s *qaService) FindSimilar(ctx context.Context, embedding []float32, topK int) ([]models.SimilarityMatch, error) <span class="cov0" title="0">{
+        matches, err := s.pinecone.Query(ctx, embedding, topK)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("pinecone query failed: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">ids := make([]uuid.UUID, 0, len(matches))
+        scoreMap := make(map[uuid.UUID]float32)
+
+        for _, match := range matches </span><span class="cov0" title="0">{
+                id, err := uuid.Parse(match.ID)
+                if err != nil </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                <span class="cov0" title="0">ids = append(ids, id)
+                scoreMap[id] = match.Score</span>
+        }
+
+        <span class="cov0" title="0">qaPairs, err := s.qaRepo.GetByIDs(ctx, ids)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to fetch Q&amp;A pairs: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">results := make([]models.SimilarityMatch, 0, len(qaPairs))
+        for _, qa := range qaPairs </span><span class="cov0" title="0">{
+                results = append(results, models.SimilarityMatch{
+                        QAPair: *qa,
+                        Score:  scoreMap[qa.ID],
+                })
+        }</span>
+
+        <span class="cov0" title="0">return results, nil</span>
+}
+
+// GetQAByIDs retrieves multiple Q&amp;A pairs by UUIDs
+func (s *qaService) GetQAByIDs(ctx context.Context, ids []uuid.UUID) ([]*models.QAPair, error) <span class="cov0" title="0">{
+        return s.qaRepo.GetByIDs(ctx, ids)
+}</span>
+
+// CreateQAWithEmbedding creates a Q&amp;A pair and stores embedding in Pinecone
+func (s *qaService) CreateQAWithEmbedding(ctx context.Context, req models.CreateQAWithEmbeddingRequest) (*models.QAPair, error) <span class="cov0" title="0">{
+        qa := &amp;models.QAPair{
+                Question: req.Question,
+                Answer:   req.Answer,
+        }
+
+        err := s.qaRepo.Create(ctx, qa)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to create Q&amp;A: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">metadata := map[string]interface{}{
+                "id":       qa.ID.String(),
+                "question": qa.Question,
+                "answer":   qa.Answer,
+        }
+
+        err = s.pinecone.Upsert(ctx, qa.ID.String(), req.Embedding, metadata)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to store embedding: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">return qa, nil</span>
+}
+
+// UpdateQAWithEmbedding updates Q&amp;A pair and embedding
+func (s *qaService) UpdateQAWithEmbedding(ctx context.Context, req models.UpdateQAWithEmbeddingRequest) (*models.QAPair, error) <span class="cov0" title="0">{
+        existing, err := s.qaRepo.GetByID(ctx, req.ID)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to get Q&amp;A: %w", err)
+        }</span>
+        <span class="cov0" title="0">if existing == nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("Q&amp;A not found")
+        }</span>
+
+        <span class="cov0" title="0">existing.Question = req.Question
+        existing.Answer = req.Answer
+
+        err = s.qaRepo.Update(ctx, existing)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to update Q&amp;A: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">metadata := map[string]interface{}{
+                "id":       existing.ID.String(),
+                "question": existing.Question,
+                "answer":   existing.Answer,
+        }
+
+        err = s.pinecone.Upsert(ctx, existing.ID.String(), req.Embedding, metadata)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to update embedding: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">return existing, nil</span>
+}
+
+// DeleteQAWithEmbedding deletes from both PostgreSQL and Pinecone
+func (s *qaService) DeleteQAWithEmbedding(ctx context.Context, id uuid.UUID) (*models.DeleteQAResponse, error) <span class="cov0" title="0">{
+        response := &amp;models.DeleteQAResponse{}
+
+        err := s.qaRepo.Delete(ctx, id)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to delete Q&amp;A from database: %w", err)
+        }</span>
+        <span class="cov0" title="0">response.DeletedFromDB = true
+
+        if s.embeddingService != nil </span><span class="cov0" title="0">{
+                err = s.embeddingService.RemoveQAPairIndex(ctx, id)
+                if err != nil </span><span class="cov0" title="0">{
+                        response.DeletedFromPinecone = false
+                }</span> else<span class="cov0" title="0"> {
+                        response.DeletedFromPinecone = true
+                }</span>
+        } else<span class="cov0" title="0"> {
+                err = s.pinecone.Delete(ctx, id.String())
+                if err != nil </span><span class="cov0" title="0">{
+                        response.DeletedFromPinecone = false
+                }</span> else<span class="cov0" title="0"> {
+                        response.DeletedFromPinecone = true
+                }</span>
+        }
+
+        <span class="cov0" title="0">response.Success = response.DeletedFromDB
+        return response, nil</span>
+}
+
+// SearchSimilarByText searches for similar Q&amp;A pairs using text query
+func (s *qaService) SearchSimilarByText(ctx context.Context, query string, topK int) ([]models.SimilarityMatch, error) <span class="cov0" title="0">{
+        if s.embeddingService == nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("embedding service not configured")
+        }</span>
+
+        // Use embedding service to search
+        <span class="cov0" title="0">matches, err := s.embeddingService.SearchSimilar(ctx, query, topK)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("similarity search failed: %w", err)
+        }</span>
+
+        // Extract IDs and scores
+        <span class="cov0" title="0">ids := make([]uuid.UUID, 0, len(matches))
+        scoreMap := make(map[uuid.UUID]float32)
+
+        for _, match := range matches </span><span class="cov0" title="0">{
+                id, err := uuid.Parse(match.ID)
+                if err != nil </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                <span class="cov0" title="0">ids = append(ids, id)
+                scoreMap[id] = match.Score</span>
+        }
+
+        // Fetch Q&amp;A pairs from database
+        <span class="cov0" title="0">qaPairs, err := s.qaRepo.GetByIDs(ctx, ids)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to fetch Q&amp;A pairs: %w", err)
+        }</span>
+
+        // Build result with scores
+        <span class="cov0" title="0">results := make([]models.SimilarityMatch, 0, len(qaPairs))
+        for _, qa := range qaPairs </span><span class="cov0" title="0">{
+                results = append(results, models.SimilarityMatch{
+                        QAPair: *qa,
+                        Score:  scoreMap[qa.ID],
+                })
+        }</span>
+
+        <span class="cov0" title="0">return results, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file13" style="display: none">package testutil
+
+import (
+        "database/sql"
+        "sync"
+
+        "github.com/DATA-DOG/go-txdb"
+        "github.com/jmoiron/sqlx"
+        _ "github.com/lib/pq"
+)
+
+var registerOnce sync.Once
+
+func init() <span class="cov3" title="2">{
+        registerOnce.Do(func() </span><span class="cov3" title="2">{
+                // Register txdb driver - wraps every connection in a transaction
+                // that rolls back on close, providing isolated tests
+                txdb.Register("txdb", "postgres",
+                        "host=localhost port=5433 user=test_user password=test_password dbname=smart_discovery_test sslmode=disable")
+        }</span>)
+}
+
+// GetTestDB returns a transactional database connection for testing.
+// Each unique identifier gets its own isolated transaction that will
+// be automatically rolled back when the connection is closed.
+//
+// Usage:
+//
+//        func TestSomething(t *testing.T) {
+//            db, _ := testutil.GetTestDB(t.Name())
+//            defer db.Close()  // Automatic rollback
+//            // Test code here
+//        }
+func GetTestDB(identifier string) (*sqlx.DB, error) <span class="cov10" title="16">{
+        db, err := sql.Open("txdb", identifier)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov10" title="16">return sqlx.NewDb(db, "postgres"), nil</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
