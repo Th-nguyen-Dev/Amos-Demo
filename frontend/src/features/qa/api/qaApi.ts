@@ -37,9 +37,7 @@ export const qaApi = createApi({
               { type: 'QAPair', id: 'LIST' },
             ]
           : [{ type: 'QAPair', id: 'LIST' }],
-      // Keep cache for 5 seconds and refetch when args change
-      keepUnusedDataFor: 5,
-      refetchOnMountOrArgChange: true,
+      keepUnusedDataFor: 0, // Disable caching for fresh data
     }),
 
     // Get single Q&A pair

@@ -215,6 +215,12 @@ class ConversationalAgent:
                 tool_input = event["data"].get("input", {})
                 tool_call_id = f"call_{str(uuid.uuid4())[:8]}"
                 
+                # If we've already saved an assistant message with tool calls,
+                # this is a new ReAct cycle - reset for the new tool call
+                if tool_call_assistant_saved:
+                    current_tool_calls = []
+                    tool_call_assistant_saved = False
+                
                 # Create tool call in OpenAI format
                 tool_call = {
                     "id": tool_call_id,

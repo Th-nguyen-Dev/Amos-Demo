@@ -95,8 +95,11 @@ func (r *conversationRepository) ListConversations(ctx context.Context, params m
 		whereSQL = "WHERE " + whereClauses[0]
 	}
 
+	// Determine sort order
+	// If no cursor, always use DESC (newest first) regardless of direction
+	// If cursor exists, use direction to determine order
 	order := "DESC"
-	if params.Direction == "prev" {
+	if params.Cursor != "" && params.Direction == "prev" {
 		order = "ASC"
 	}
 
@@ -123,7 +126,8 @@ func (r *conversationRepository) ListConversations(ctx context.Context, params m
 		conversations = conversations[:params.Limit]
 	}
 
-	if params.Direction == "prev" {
+	// Only reverse if we actually used prev direction with a cursor
+	if params.Cursor != "" && params.Direction == "prev" {
 		for i, j := 0, len(conversations)-1; i < j; i, j = i+1, j-1 {
 			conversations[i], conversations[j] = conversations[j], conversations[i]
 		}
@@ -222,8 +226,11 @@ func (r *conversationRepository) GetMessages(ctx context.Context, conversationID
 		whereSQL += " AND " + whereClauses[1]
 	}
 
+	// Determine sort order for messages (default ASC = oldest first for chat)
+	// If no cursor, always use ASC regardless of direction
+	// If cursor exists, use direction to determine order
 	order := "ASC"
-	if params.Direction == "prev" {
+	if params.Cursor != "" && params.Direction == "prev" {
 		order = "DESC"
 	}
 
@@ -268,7 +275,8 @@ func (r *conversationRepository) GetMessages(ctx context.Context, conversationID
 		messages = messages[:params.Limit]
 	}
 
-	if params.Direction == "prev" {
+	// Only reverse if we actually used prev direction with a cursor
+	if params.Cursor != "" && params.Direction == "prev" {
 		for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
 			messages[i], messages[j] = messages[j], messages[i]
 		}

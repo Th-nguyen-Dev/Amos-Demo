@@ -58,7 +58,11 @@ export function QAManagementPage() {
   }), [cursor, direction, debouncedSearch])
 
   // API hooks
-  const { data, isLoading, error } = useListQAPairsQuery(queryParams)
+  const { data, isLoading, error } = useListQAPairsQuery(queryParams, {
+    refetchOnMountOrArgChange: 1, // Refetch if data is older than 1 second
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+  })
   const [createQAPair, { isLoading: isCreating }] = useCreateQAPairMutation()
   const [updateQAPair, { isLoading: isUpdating }] = useUpdateQAPairMutation()
   const [deleteQAPair, { isLoading: isDeleting }] = useDeleteQAPairMutation()

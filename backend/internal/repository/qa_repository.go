@@ -153,8 +153,11 @@ func (r *qaRepository) List(ctx context.Context, params models.CursorParams) ([]
 		whereSQL = "WHERE " + whereClauses[0]
 	}
 
+	// Determine sort order
+	// If no cursor, always use DESC (newest first) regardless of direction
+	// If cursor exists, use direction to determine order
 	order := "DESC"
-	if params.Direction == "prev" {
+	if params.Cursor != "" && params.Direction == "prev" {
 		order = "ASC"
 	}
 
@@ -181,7 +184,8 @@ func (r *qaRepository) List(ctx context.Context, params models.CursorParams) ([]
 		qaPairs = qaPairs[:params.Limit]
 	}
 
-	if params.Direction == "prev" {
+	// Only reverse if we actually used prev direction with a cursor
+	if params.Cursor != "" && params.Direction == "prev" {
 		for i, j := 0, len(qaPairs)-1; i < j; i, j = i+1, j-1 {
 			qaPairs[i], qaPairs[j] = qaPairs[j], qaPairs[i]
 		}

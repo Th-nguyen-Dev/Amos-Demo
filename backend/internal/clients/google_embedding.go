@@ -4,8 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"google.golang.org/api/aiplatform/v1"
-	"google.golang.org/api/option"
+	"google.golang.org/genai"
 )
 
 // EmbeddingClient defines embedding generation operations
@@ -14,133 +13,100 @@ type EmbeddingClient interface {
 	GenerateBatchEmbeddings(ctx context.Context, texts []string) ([][]float32, error)
 }
 
-// GoogleEmbeddingClient implements embedding generation using Google's text-embedding models
+// GoogleEmbeddingClient implements embedding generation using Google's Gemini API
 type GoogleEmbeddingClient struct {
-	service   *aiplatform.Service
-	projectID string
-	location  string
-	model     string
+	client *genai.Client
+	model  string
 }
 
 // GoogleEmbeddingConfig holds configuration for Google Embedding client
 type GoogleEmbeddingConfig struct {
 	APIKey    string
-	ProjectID string
-	Location  string
+	ProjectID string // Not needed for Gemini API
+	Location  string // Not needed for Gemini API
 	Model     string
 }
 
-// NewGoogleEmbeddingClient creates a new Google Embedding client
+// NewGoogleEmbeddingClient creates a new Google Embedding client using Gemini API
 func NewGoogleEmbeddingClient(ctx context.Context, config GoogleEmbeddingConfig) (EmbeddingClient, error) {
+	if config.APIKey == "" {
+		return nil, fmt.Errorf("API key is required for Gemini API")
+	}
+
 	if config.Model == "" {
-		config.Model = "text-embedding-004"
-	}
-	if config.Location == "" {
-		config.Location = "us-central1"
+		config.Model = "gemini-embedding-001"
 	}
 
-	var opts []option.ClientOption
-	if config.APIKey != "" {
-		opts = append(opts, option.WithAPIKey(config.APIKey))
-	}
-
-	service, err := aiplatform.NewService(ctx, opts...)
+	// Create Gemini client with API key
+	// The API key can also be set via GEMINI_API_KEY environment variable
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey: config.APIKey,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create AI Platform service: %w", err)
+		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
 
 	return &GoogleEmbeddingClient{
-		service:   service,
-		projectID: config.ProjectID,
-		location:  config.Location,
-		model:     config.Model,
+		client: client,
+		model:  config.Model,
 	}, nil
 }
 
-// GenerateEmbedding generates an embedding for a single text
+// GenerateEmbedding generates an embedding for a single text using Gemini API
 func (c *GoogleEmbeddingClient) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
-	embeddings, err := c.GenerateBatchEmbeddings(ctx, []string{text})
-	if err != nil {
-		return nil, err
+	// Create content from text
+	contents := []*genai.Content{
+		genai.NewContentFromText(text, genai.RoleUser),
 	}
-	if len(embeddings) == 0 {
+
+	// Call EmbedContent API
+	result, err := c.client.Models.EmbedContent(ctx, c.model, contents, nil)
+	if err != nil {
+		return nil, fmt.Errorf("embedding request failed: %w", err)
+	}
+
+	if len(result.Embeddings) == 0 {
 		return nil, fmt.Errorf("no embeddings returned")
 	}
-	return embeddings[0], nil
+
+	// Get the first embedding
+	embedding := result.Embeddings[0]
+	if len(embedding.Values) == 0 {
+		return nil, fmt.Errorf("no embedding values returned")
+	}
+
+	return embedding.Values, nil
 }
 
-// GenerateBatchEmbeddings generates embeddings for multiple texts
+// GenerateBatchEmbeddings generates embeddings for multiple texts in a single API call
 func (c *GoogleEmbeddingClient) GenerateBatchEmbeddings(ctx context.Context, texts []string) ([][]float32, error) {
 	if len(texts) == 0 {
 		return nil, fmt.Errorf("no texts provided")
 	}
 
-	// Construct the endpoint
-	endpoint := fmt.Sprintf("projects/%s/locations/%s/publishers/google/models/%s",
-		c.projectID, c.location, c.model)
-
-	instances := make([]interface{}, len(texts))
+	// Create contents from all texts - the API supports batch processing!
+	contents := make([]*genai.Content, len(texts))
 	for i, text := range texts {
-		instances[i] = &aiplatform.GoogleCloudAiplatformV1Content{
-			Parts: []*aiplatform.GoogleCloudAiplatformV1Part{
-				{
-					Text: text,
-				},
-			},
-		}
+		contents[i] = genai.NewContentFromText(text, genai.RoleUser)
 	}
 
-	req := &aiplatform.GoogleCloudAiplatformV1PredictRequest{
-		Instances: instances,
-	}
-
-	resp, err := c.service.Projects.Locations.Endpoints.Predict(endpoint, req).Context(ctx).Do()
+	// Call EmbedContent API with all contents at once
+	result, err := c.client.Models.EmbedContent(ctx, c.model, contents, nil)
 	if err != nil {
-		return nil, fmt.Errorf("embedding request failed: %w", err)
+		return nil, fmt.Errorf("batch embedding request failed: %w", err)
 	}
 
+	if len(result.Embeddings) != len(texts) {
+		return nil, fmt.Errorf("expected %d embeddings, got %d", len(texts), len(result.Embeddings))
+	}
+
+	// Extract embeddings
 	embeddings := make([][]float32, len(texts))
-	for i, prediction := range resp.Predictions {
-		if i >= len(texts) {
-			break
+	for i, embedding := range result.Embeddings {
+		if len(embedding.Values) == 0 {
+			return nil, fmt.Errorf("no embedding values returned for text %d", i)
 		}
-
-		// The prediction contains an object with "embeddings" field
-		predMap, ok := prediction.(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("unexpected prediction format")
-		}
-
-		embeddingsObj, ok := predMap["embeddings"]
-		if !ok {
-			return nil, fmt.Errorf("no embeddings field in prediction")
-		}
-
-		embeddingsMap, ok := embeddingsObj.(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("unexpected embeddings format")
-		}
-
-		valuesObj, ok := embeddingsMap["values"]
-		if !ok {
-			return nil, fmt.Errorf("no values field in embeddings")
-		}
-
-		valuesSlice, ok := valuesObj.([]interface{})
-		if !ok {
-			return nil, fmt.Errorf("unexpected values format")
-		}
-
-		embedding := make([]float32, len(valuesSlice))
-		for j, val := range valuesSlice {
-			floatVal, ok := val.(float64)
-			if !ok {
-				return nil, fmt.Errorf("unexpected value type at index %d", j)
-			}
-			embedding[j] = float32(floatVal)
-		}
-
-		embeddings[i] = embedding
+		embeddings[i] = embedding.Values
 	}
 
 	return embeddings, nil

@@ -54,19 +54,21 @@ services:
       - SERVER_ENVIRONMENT=development
       
       # Pinecone Configuration
-      # For LOCAL TESTING: Set PINECONE_HOST to use in-memory Pinecone Local
-      # For PRODUCTION: Remove PINECONE_HOST and set real API key to use Pinecone Cloud (persistent)
-      - PINECONE_API_KEY=pclocal              # Use real key for cloud
-      - PINECONE_HOST=http://pinecone-local:5081  # Remove this line for cloud
-      - PINECONE_INDEX_NAME=qa-index
-      - PINECONE_NAMESPACE=
-      # - PINECONE_ENVIRONMENT=us-west1-gcp   # Uncomment for cloud
+      # Set these in your .env file:
+      # - For CLOUD: Set PINECONE_API_KEY, PINECONE_ENVIRONMENT, PINECONE_HOST=
+      # - For LOCAL: Set PINECONE_HOST=http://pinecone-local:5081, PINECONE_API_KEY=pclocal
+      - PINECONE_API_KEY=${PINECONE_API_KEY}
+      - PINECONE_HOST=${PINECONE_HOST}
+      - PINECONE_INDEX_NAME=${PINECONE_INDEX_NAME}
+      - PINECONE_NAMESPACE=${PINECONE_NAMESPACE}
+      - PINECONE_ENVIRONMENT=${PINECONE_ENVIRONMENT}
       
-      # Google Embedding (optional - will use mock if not set)
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
-      - GOOGLE_PROJECT_ID=${GOOGLE_PROJECT_ID:-}
+      # Google Gemini API for Embeddings (using official google.golang.org/genai SDK)
+      # API key authentication - no service account needed!
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GOOGLE_PROJECT_ID=${GOOGLE_PROJECT_ID}
       - GOOGLE_LOCATION=us-central1
-      - GOOGLE_EMBEDDING_MODEL=text-embedding-004
+      - GOOGLE_EMBEDDING_MODEL=gemini-embedding-001
     ports:
       - "8080:8080"
     depends_on:
