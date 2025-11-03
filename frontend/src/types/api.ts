@@ -1,6 +1,9 @@
 // API request and response types
 
-import { QAPair, CursorPagination, Conversation, Message, SimilarityMatch } from './models'
+import type { QAPair, CursorPagination, Conversation, Message, SimilarityMatch } from './models'
+
+// Re-export for convenience
+export type { QAPair, CursorPagination }
 
 // Error Response
 export interface ErrorResponse {

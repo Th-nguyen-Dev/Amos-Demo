@@ -6,3 +6,4 @@ export interface ChatMessage {
   timestamp: Date
 }
 
+

@@ -4,6 +4,7 @@ import { store } from './app/store'
 import { Layout } from './components/Layout'
 import { QAManagementPage } from './features/qa/pages/QAManagementPage'
 import { ChatPage } from './features/chat/pages/ChatPage'
+import { Toaster } from './components/ui/sonner'
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
             <Route path="chat" element={<ChatPage />} />
           </Route>
         </Routes>
+        <Toaster />
       </BrowserRouter>
     </Provider>
   )

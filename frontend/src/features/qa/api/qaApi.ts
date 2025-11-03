@@ -18,12 +18,13 @@ export const qaApi = createApi({
   endpoints: (builder) => ({
     // List Q&A pairs with pagination and search
     listQAPairs: builder.query<ListQAResponse, CursorParams | void>({
-      query: (params = {}) => {
+      query: (params) => {
         const searchParams = new URLSearchParams()
-        if (params.limit) searchParams.append('limit', params.limit.toString())
-        if (params.cursor) searchParams.append('cursor', params.cursor)
-        if (params.direction) searchParams.append('direction', params.direction)
-        if (params.search) searchParams.append('search', params.search)
+        const p = params || {}
+        if (p.limit) searchParams.append('limit', p.limit.toString())
+        if (p.cursor) searchParams.append('cursor', p.cursor)
+        if (p.direction) searchParams.append('direction', p.direction)
+        if (p.search) searchParams.append('search', p.search)
         
         return {
           url: `/qa-pairs?${searchParams.toString()}`,
@@ -41,7 +42,7 @@ export const qaApi = createApi({
     // Get single Q&A pair
     getQAPair: builder.query<QAPair, string>({
       query: (id) => `/qa-pairs/${id}`,
-      providesTags: (result, error, id) => [{ type: 'QAPair', id }],
+      providesTags: (_result, _error, id) => [{ type: 'QAPair', id }],
     }),
 
     // Create Q&A pair
@@ -61,7 +62,7 @@ export const qaApi = createApi({
         method: 'PUT',
         body: data,
       }),
-      invalidatesTags: (result, error, { id }) => [
+      invalidatesTags: (_result, _error, { id }) => [
         { type: 'QAPair', id },
         { type: 'QAPair', id: 'LIST' },
       ],
@@ -73,7 +74,7 @@ export const qaApi = createApi({
         url: `/qa-pairs/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: (result, error, id) => [
+      invalidatesTags: (_result, _error, id) => [
         { type: 'QAPair', id },
         { type: 'QAPair', id: 'LIST' },
       ],
