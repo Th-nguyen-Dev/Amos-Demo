@@ -86,16 +86,28 @@ func (s *embeddingService) GenerateEmbedding(ctx context.Context, text string) (
 
 // SearchSimilar searches for similar Q&A pairs using embedding
 func (s *embeddingService) SearchSimilar(ctx context.Context, queryText string, topK int) ([]clients.PineconeMatch, error) {
+	fmt.Printf("🧠 EmbeddingService: Generating embedding for query='%s'\n", queryText)
+	
 	// Generate embedding for the query
 	embedding, err := s.embeddingClient.GenerateEmbedding(ctx, queryText)
 	if err != nil {
+		fmt.Printf("❌ Failed to generate embedding: %v\n", err)
 		return nil, fmt.Errorf("failed to generate query embedding: %w", err)
 	}
+
+	fmt.Printf("✅ Generated embedding vector (dim=%d)\n", len(embedding))
+	fmt.Printf("🔎 Querying Pinecone with topK=%d\n", topK)
 
 	// Query Pinecone
 	matches, err := s.pineconeClient.Query(ctx, embedding, topK)
 	if err != nil {
+		fmt.Printf("❌ Pinecone query failed: %v\n", err)
 		return nil, fmt.Errorf("failed to query Pinecone: %w", err)
+	}
+
+	fmt.Printf("✅ Pinecone returned %d matches\n", len(matches))
+	for i, match := range matches {
+		fmt.Printf("  Match %d: ID=%s, Score=%.4f\n", i+1, match.ID, match.Score)
 	}
 
 	return matches, nil

@@ -19,7 +19,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 export function ChatPage() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
   const [streamingMessage, setStreamingMessage] = useState<string>('')
-  const [streamingToolCalls, setStreamingToolCalls] = useState<Array<{name: string, status: 'loading' | 'complete'}>>([])
+  const [streamingToolCalls, setStreamingToolCalls] = useState<Array<{id: string, name: string, arguments: string, status: 'loading' | 'complete'}>>([])
   const [pendingUserMessage, setPendingUserMessage] = useState<string>('')
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -103,35 +103,46 @@ export function ChatPage() {
     setStreamingToolCalls([])
 
     try {
-      let fullText = ''
-      
-      // Stream the response
+      // Stream the response - handle LangChain events
       for await (const event of sendMessageStreaming(selectedConversationId, message)) {
-        if (event.type === 'content') {
-          // Text content from AI
-          fullText += event.data.content || ''
-          setStreamingMessage(fullText)
-        } 
-        else if (event.type === 'tool_call_start') {
-          // Tool execution started
-          setStreamingToolCalls(prev => [...prev, {
-            name: event.data.name || 'unknown',
-            status: 'loading'
-          }])
-        } 
-        else if (event.type === 'tool_call_end') {
-          // Tool execution completed
-          setStreamingToolCalls(prev =>
-            prev.map((tc, idx) =>
-              idx === prev.length - 1
-                ? { ...tc, status: event.data.status === 'success' ? 'complete' : 'complete' }
-                : tc
-            )
-          )
+        if (event.type === 'langchain_event') {
+          // Text streaming
+          if (event.data.event === 'on_chat_model_stream') {
+            const chunk = event.data.data?.chunk
+            
+            // Accumulate text content
+            if (chunk?.content) {
+              setStreamingMessage(prev => prev + chunk.content)
+            }
+            
+            // Tool calls announced - use LLM's native IDs
+            if (chunk?.tool_calls && chunk.tool_calls.length > 0) {
+              setStreamingToolCalls(chunk.tool_calls.map(tc => ({
+                id: tc.id,  // LLM's UUID
+                name: tc.name,
+                arguments: JSON.stringify(tc.args),
+                status: 'loading' as const
+              })))
+            }
+          }
+          
+          // Tool result arrived - match by tool_call_id
+          else if (event.data.event === 'on_tool_end') {
+            const toolMessage = event.data.data?.output
+            if (toolMessage?.tool_call_id) {
+              setStreamingToolCalls(prev =>
+                prev.map(tc =>
+                  tc.id === toolMessage.tool_call_id
+                    ? { ...tc, status: 'complete' as const }
+                    : tc
+                )
+              )
+            }
+          }
         }
         else if (event.type === 'error') {
-          console.error('Stream error:', event.data.message)
-          toast.error(event.data.message || 'An error occurred')
+          console.error('Stream error:', event.data?.message)
+          toast.error(event.data?.message || 'An error occurred')
         }
       }
 

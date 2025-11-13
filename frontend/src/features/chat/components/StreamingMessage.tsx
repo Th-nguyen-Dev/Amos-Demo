@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 
 interface StreamingMessageProps {
   content: string
-  toolCalls: Array<{ name: string, status: 'loading' | 'complete' }>
+  toolCalls: Array<{ id: string, name: string, arguments: string, status: 'loading' | 'complete' }>
 }
 
 export function StreamingMessage({ content, toolCalls }: StreamingMessageProps) {
@@ -19,9 +19,9 @@ export function StreamingMessage({ content, toolCalls }: StreamingMessageProps) 
         {/* Tool calls with pulsing animation */}
         {toolCalls.length > 0 && (
           <div className="flex flex-col gap-2">
-            {toolCalls.map((toolCall, index) => (
+            {toolCalls.map((toolCall) => (
               <div
-                key={index}
+                key={toolCall.id}
                 className={cn(
                   "transition-all duration-500",
                   toolCall.status === 'loading' && "animate-pulse"

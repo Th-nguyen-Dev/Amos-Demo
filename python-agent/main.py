@@ -4,6 +4,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from agent.config import settings
 from api.routes import router as chat_router
 import uvicorn
+import logging
+
+# Configure logging to show INFO level messages from our agent
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s:     %(name)s - %(message)s',
+    handlers=[logging.StreamHandler()]
+)
+logging.getLogger('agent.agent').setLevel(logging.INFO)
+logging.getLogger('agent.tools').setLevel(logging.INFO)
 
 app = FastAPI(
     title="LangChain AI Agent",

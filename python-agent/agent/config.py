@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     
     # Gemini Configuration
     gemini_api_key: str
-    gemini_model: str = "gemini-2.0-flash-exp"
+    gemini_model: str = "gemini-2.5-flash"
     
     # Go Backend Configuration
     backend_url: str = "http://localhost:8080"

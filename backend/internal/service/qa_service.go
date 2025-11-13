@@ -275,11 +275,16 @@ func (s *qaService) SearchSimilarByText(ctx context.Context, query string, topK 
 		return nil, fmt.Errorf("embedding service not configured")
 	}
 
+	fmt.Printf("📊 QAService: Calling embedding service for query='%s', topK=%d\n", query, topK)
+
 	// Use embedding service to search
 	matches, err := s.embeddingService.SearchSimilar(ctx, query, topK)
 	if err != nil {
+		fmt.Printf("❌ Embedding service search failed: %v\n", err)
 		return nil, fmt.Errorf("similarity search failed: %w", err)
 	}
+
+	fmt.Printf("📊 Embedding service returned %d matches\n", len(matches))
 
 	// Extract IDs and scores
 	ids := make([]uuid.UUID, 0, len(matches))
@@ -288,17 +293,23 @@ func (s *qaService) SearchSimilarByText(ctx context.Context, query string, topK 
 	for _, match := range matches {
 		id, err := uuid.Parse(match.ID)
 		if err != nil {
+			fmt.Printf("⚠️ Failed to parse ID '%s': %v\n", match.ID, err)
 			continue
 		}
 		ids = append(ids, id)
 		scoreMap[id] = match.Score
 	}
 
+	fmt.Printf("📊 Fetching %d Q&A pairs from database\n", len(ids))
+
 	// Fetch Q&A pairs from database
 	qaPairs, err := s.qaRepo.GetByIDs(ctx, ids)
 	if err != nil {
+		fmt.Printf("❌ Failed to fetch Q&A pairs: %v\n", err)
 		return nil, fmt.Errorf("failed to fetch Q&A pairs: %w", err)
 	}
+
+	fmt.Printf("📊 Retrieved %d Q&A pairs from database\n", len(qaPairs))
 
 	// Build result with scores
 	results := make([]models.SimilarityMatch, 0, len(qaPairs))
@@ -309,5 +320,6 @@ func (s *qaService) SearchSimilarByText(ctx context.Context, query string, topK 
 		})
 	}
 
+	fmt.Printf("✅ Returning %d similarity matches\n", len(results))
 	return results, nil
 }

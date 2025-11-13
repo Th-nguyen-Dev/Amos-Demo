@@ -1110,3 +1110,8 @@ go build -o bin/server cmd/server/main.go
 
 **Built with clean architecture principles and modern Go practices** 🚀
 
+
+
+
+
+

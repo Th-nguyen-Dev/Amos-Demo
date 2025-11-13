@@ -91,6 +91,14 @@ class ConversationalAgent:
         """Load conversation history and convert to LangChain format."""
         messages = await self.backend_client.get_messages(conversation_id)
         
+        # First pass: collect all tool_call_ids that have responses
+        completed_tool_call_ids = set()
+        for msg in messages:
+            if msg.role == "tool":
+                tool_call_id = msg.raw_message.get("tool_call_id")
+                if tool_call_id:
+                    completed_tool_call_ids.add(tool_call_id)
+        
         langchain_messages = []
         for msg in messages:
             raw = msg.raw_message
@@ -105,20 +113,30 @@ class ConversationalAgent:
                     import json
                     langchain_tool_calls = []
                     for tc in raw["tool_calls"]:
-                        # OpenAI: {"id": "...", "type": "function", "function": {"name": "...", "arguments": "..."}}
-                        # LangChain: {"name": "...", "args": {...}, "id": "..."}
-                        langchain_tool_calls.append({
-                            "name": tc["function"]["name"],
-                            "args": json.loads(tc["function"]["arguments"]),
-                            "id": tc["id"]
-                        })
+                        # Only include tool calls that have corresponding ToolMessages
+                        if tc["id"] in completed_tool_call_ids:
+                            # OpenAI: {"id": "...", "type": "function", "function": {"name": "...", "arguments": "..."}}
+                            # LangChain: {"name": "...", "args": {...}, "id": "..."}
+                            langchain_tool_calls.append({
+                                "name": tc["function"]["name"],
+                                "args": json.loads(tc["function"]["arguments"]),
+                                "id": tc["id"]
+                            })
                     
-                    langchain_messages.append(
-                        AIMessage(
-                            content=raw.get("content") or "",
-                            tool_calls=langchain_tool_calls
+                    # Only add the AIMessage if it has valid tool calls or content
+                    if langchain_tool_calls:
+                        langchain_messages.append(
+                            AIMessage(
+                                content=raw.get("content") or "",
+                                tool_calls=langchain_tool_calls
+                            )
                         )
-                    )
+                    elif raw.get("content"):
+                        # If no valid tool calls but has content, add as regular message
+                        langchain_messages.append(
+                            AIMessage(content=raw.get("content", ""))
+                        )
+                    # Otherwise skip this orphaned tool-calling message
                 else:
                     langchain_messages.append(
                         AIMessage(content=raw.get("content", ""))
@@ -183,15 +201,8 @@ class ConversationalAgent:
         # Add user message to history
         history.append(HumanMessage(content=user_message))
         
-        # Stream agent response with tool call tracking
+        # Stream agent response
         import json
-        import time
-        import uuid
-        
-        current_tool_calls = []  # Tool calls for current assistant message
-        tool_call_assistant_saved = False  # Track if we saved the tool-calling message
-        final_response = ""  # Final response after tools complete
-        in_final_response = False  # Track if we're in the final response phase
         
         async for event in self.agent.astream_events(
             {"messages": history},
@@ -203,130 +214,105 @@ class ConversationalAgent:
         ):
             kind = event["event"]
             
+            # Stream only essential LangChain events to frontend
             if kind == "on_chat_model_stream":
                 chunk = event["data"]["chunk"]
-                if hasattr(chunk, "content") and chunk.content:
-                    # Always accumulate content for saving
-                    final_response += chunk.content
-                    
-                    # Check if we're past tool execution
-                    if current_tool_calls and tool_call_assistant_saved:
-                        in_final_response = True
-                    
-                    # Stream as structured JSON
-                    yield json.dumps({
-                        "type": "content",
-                        "data": chunk.content
-                    })
-            
-            elif kind == "on_tool_start":
-                tool_name = event["name"]
-                tool_input = event["data"].get("input", {})
-                tool_call_id = f"call_{str(uuid.uuid4())[:8]}"
-                
-                # If we've already saved an assistant message with tool calls,
-                # this is a new ReAct cycle - reset for the new tool call
-                if tool_call_assistant_saved:
-                    current_tool_calls = []
-                    tool_call_assistant_saved = False
-                
-                # Create tool call in OpenAI format
-                tool_call = {
-                    "id": tool_call_id,
-                    "type": "function",
-                    "function": {
-                        "name": tool_name,
-                        "arguments": json.dumps(tool_input)
+                # Serialize the chunk data
+                serializable_event = {
+                    "event": kind,
+                    "data": {
+                        "chunk": {
+                            "content": chunk.content if hasattr(chunk, "content") else "",
+                            "tool_calls": chunk.tool_calls if hasattr(chunk, "tool_calls") and chunk.tool_calls else []
+                        }
                     }
                 }
-                current_tool_calls.append(tool_call)
-                
-                # Save assistant message with tool_calls if not already saved
-                if not tool_call_assistant_saved and current_tool_calls:
-                    assistant_with_tools = {
-                        "role": "assistant",
-                        "content": None,
-                        "tool_calls": current_tool_calls.copy()
-                    }
-                    await self.backend_client.save_message(
-                        conversation_id=conversation_id,
-                        role="assistant",
-                        content=None,
-                        tool_call_id=None,
-                        raw_message=assistant_with_tools
-                    )
-                    tool_call_assistant_saved = True
-                
-                # Stream structured tool call event
                 yield json.dumps({
-                    "type": "tool_call_start",
+                    "type": "langchain_event",
+                    "data": serializable_event
+                })
+            
+            elif kind == "on_tool_start":
+                # Already serializable
+                yield json.dumps({
+                    "type": "langchain_event",
                     "data": {
-                        "id": tool_call_id,
-                        "name": tool_name,
-                        "args": tool_input
+                        "event": kind,
+                        "name": event["name"],
+                        "data": event["data"]
                     }
                 })
             
             elif kind == "on_tool_end":
-                tool_name = event["name"]
-                tool_output = event["data"].get("output", "")
-                
-                # Find the matching tool call
-                matching_tool_call = None
-                for tc in current_tool_calls:
-                    if tc["function"]["name"] == tool_name:
-                        matching_tool_call = tc
-                        break
-                
-                # Save tool result message immediately
-                # IMPORTANT: tool_output is already a formatted string from the tool function
-                # For semantic search, this contains only: question, answer, score, and ID
-                # NO vector/embedding data is stored - only human-readable results
-                if matching_tool_call:
-                    tool_result_msg = {
-                        "role": "tool",
-                        "content": str(tool_output),
-                        "tool_call_id": matching_tool_call["id"],
-                        "name": tool_name
-                    }
-                    await self.backend_client.save_message(
-                        conversation_id=conversation_id,
-                        role="tool",
-                        content=str(tool_output),
-                        tool_call_id=matching_tool_call["id"],
-                        raw_message=tool_result_msg
-                    )
-                
-                # Determine success/failure
-                is_success = not any(phrase in str(tool_output).lower() 
-                                   for phrase in ["no relevant", "not found", "error"])
-                
-                # Stream structured tool result event
-                output_preview = str(tool_output)[:300]
-                if len(str(tool_output)) > 300:
-                    output_preview += "... (truncated)"
-                
+                # Extract ToolMessage and make it serializable
+                tool_message = event["data"]["output"]
                 yield json.dumps({
-                    "type": "tool_call_end",
+                    "type": "langchain_event",
                     "data": {
-                        "id": matching_tool_call["id"] if matching_tool_call else None,
-                        "name": tool_name,
-                        "status": "success" if is_success else "error",
-                        "output_preview": output_preview
+                        "event": kind,
+                        "name": event["name"],
+                        "data": {
+                            "output": {
+                                "tool_call_id": tool_message.tool_call_id,
+                                "name": tool_message.name,
+                                "content": tool_message.content
+                            }
+                        }
                     }
                 })
-        
-        # Save final assistant message with the answer (separate from tool calls)
-        if final_response:
-            final_assistant_msg = {
-                "role": "assistant",
-                "content": final_response
-            }
-            await self.backend_client.save_message(
-                conversation_id=conversation_id,
-                role="assistant",
-                content=final_response,
-                tool_call_id=None,
-                raw_message=final_assistant_msg
-            )
+            
+            # Save messages to DB in OpenAI format
+            if kind == "on_chat_model_end":
+                # Extract the complete AIMessage
+                ai_message = event["data"]["output"]["generations"][0][0]["message"]
+                
+                # Convert to OpenAI format with LLM's native tool_call IDs
+                openai_msg = {
+                    "role": "assistant",
+                    "content": ai_message.content or "",
+                }
+                
+                # Add tool_calls if present (uses LLM's UUIDs)
+                if hasattr(ai_message, "tool_calls") and ai_message.tool_calls:
+                    openai_msg["tool_calls"] = [
+                        {
+                            "id": tc["id"],
+                            "type": "function",
+                            "function": {
+                                "name": tc["name"],
+                                "arguments": json.dumps(tc["args"])
+                            }
+                        }
+                        for tc in ai_message.tool_calls
+                    ]
+                
+                # Save to database
+                await self.backend_client.save_message(
+                    conversation_id=conversation_id,
+                    role="assistant",
+                    content=openai_msg.get("content"),
+                    tool_call_id=None,
+                    raw_message=openai_msg
+                )
+            
+            elif kind == "on_tool_end":
+                # Extract the ToolMessage
+                tool_message = event["data"]["output"]
+                
+                # Convert to OpenAI format with LLM's native tool_call ID
+                openai_msg = {
+                    "role": "tool",
+                    "tool_call_id": tool_message.tool_call_id,
+                    "name": tool_message.name,
+                    "content": tool_message.content
+                }
+                
+                # Save to database
+                await self.backend_client.save_message(
+                    conversation_id=conversation_id,
+                    role="tool",
+                    content=tool_message.content,
+                    tool_call_id=tool_message.tool_call_id,
+                    raw_message=openai_msg
+                )
 

@@ -96,16 +96,26 @@ async def semantic_search_knowledge_base(
     
     Returns: Matching Q&A pairs with similarity scores (0.0-1.0, higher is more similar).
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
+        logger.info(f"🔍 Semantic search called with query='{query}', top_k={top_k}")
+        logger.info(f"📡 Calling backend at: {backend_client.base_url}/tools/semantic-search-qa")
+        
         response = await backend_client.semantic_search_qa(query, top_k)
         
+        logger.info(f"✅ Semantic search response: count={response.count}")
+        
         if response.count == 0:
+            logger.warning(f"⚠️ No semantic search results found for query: '{query}'")
             return "No semantically similar information found in the knowledge base."
         
         results = []
         for i, match in enumerate(response.results, 1):
             # Format with score as percentage for clarity
             similarity_pct = match.score * 100
+            logger.debug(f"  Result {i}: score={similarity_pct:.1f}%, question='{match.qa_pair.question[:50]}...'")
             results.append(
                 f"Result {i} (Similarity: {similarity_pct:.1f}%):\n"
                 f"Question: {match.qa_pair.question}\n"
@@ -113,8 +123,10 @@ async def semantic_search_knowledge_base(
                 f"ID: {match.qa_pair.id}"
             )
         
+        logger.info(f"✅ Returning {len(results)} semantic search results")
         return "\n\n".join(results)
     except Exception as e:
+        logger.error(f"❌ Semantic search error: {str(e)}", exc_info=True)
         return f"Error in semantic search: {str(e)}"
 
 

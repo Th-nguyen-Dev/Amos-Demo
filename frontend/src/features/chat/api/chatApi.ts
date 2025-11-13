@@ -77,17 +77,27 @@ export const chatApi = createApi({
 
 // Streaming event types from Python agent
 export interface StreamEvent {
-  type: 'content' | 'tool_call_start' | 'tool_call_end' | 'error'
+  type: 'langchain_event' | 'error'
   data: {
-    // For content
-    content?: string
-    // For tool_call_start
-    id?: string
+    // For langchain_event
+    event?: string
     name?: string
-    args?: Record<string, unknown>
-    // For tool_call_end
-    status?: 'success' | 'error'
-    output_preview?: string
+    data?: {
+      chunk?: {
+        content?: string
+        tool_calls?: Array<{
+          id: string
+          name: string
+          args: Record<string, unknown>
+        }>
+      }
+      input?: Record<string, unknown>
+      output?: {
+        tool_call_id?: string
+        name?: string
+        content?: string
+      }
+    }
     // For error
     message?: string
   }

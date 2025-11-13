@@ -92,7 +92,7 @@ services:
       - BACKEND_URL=http://backend:8080
       
       # Feature Flags
-      - USE_PINECONE=false
+      - USE_PINECONE=true
       
       # API Configuration
       - API_HOST=0.0.0.0

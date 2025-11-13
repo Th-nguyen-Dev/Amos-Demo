@@ -203,16 +203,22 @@ func main() {
 		tools.POST("/semantic-search-qa", func(c *gin.Context) {
 			var req models.SemanticSearchRequest
 			if err := c.ShouldBindJSON(&req); err != nil {
+				log.Printf("❌ Semantic search: Invalid request - %v", err)
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
 
+			log.Printf("🔍 Semantic search request: query='%s', top_k=%d", req.Query, req.TopK)
+
 			// Use semantic search service
 			matches, err := qaService.SearchSimilarByText(c.Request.Context(), req.Query, req.TopK)
 			if err != nil {
+				log.Printf("❌ Semantic search failed: %v", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
+
+			log.Printf("✅ Semantic search returned %d results", len(matches))
 
 			c.JSON(http.StatusOK, models.SemanticSearchResponse{
 				Results: matches,

@@ -62,9 +62,10 @@ export function ChatMessage({ message, toolMessages = [] }: ChatMessageProps) {
         )}
         
         {/* Tool calls - rendered from JSONB raw_message */}
-        {toolCalls && toolCalls.length > 0 && (
+        {((toolCalls && toolCalls.length > 0) || toolMessages.length > 0) && (
           <div className="flex flex-col gap-2">
-            {toolCalls.map((toolCall, index) => {
+            {/* First, render tools that are in the tool_calls array */}
+            {toolCalls?.map((toolCall, index) => {
               // Find the corresponding tool result message
               const toolResult = toolMessages.find(
                 (msg) => msg.role === 'tool' && msg.tool_call_id === toolCall.id
@@ -109,6 +110,38 @@ export function ChatMessage({ message, toolMessages = [] }: ChatMessageProps) {
                 </Tool>
               )
             })}
+            
+            {/* Also render any "orphaned" tool messages not in tool_calls */}
+            {toolMessages
+              .filter((msg) => msg.role === 'tool' && !toolCalls?.some((tc) => tc.id === msg.tool_call_id))
+              .map((toolMsg, index) => {
+                const toolName = toolMsg.raw_message?.name || 'Unknown Tool'
+                const isSuccess = toolMsg.content && 
+                                !toolMsg.content.toLowerCase().includes('no relevant') &&
+                                !toolMsg.content.toLowerCase().includes('not found') &&
+                                !toolMsg.content.toLowerCase().includes('error')
+                
+                return (
+                  <Tool 
+                    key={toolMsg.id} 
+                    status={isSuccess ? "success" : "error"}
+                    defaultOpen={false}
+                  >
+                    <ToolHeader status={isSuccess ? "success" : "error"}>
+                      🔧 {toolName}
+                    </ToolHeader>
+                    <ToolContent>
+                      <ToolOutput>
+                        <div className="text-xs whitespace-pre-wrap max-h-40 overflow-y-auto">
+                          {toolMsg.content?.slice(0, 300)}
+                          {toolMsg.content && toolMsg.content.length > 300 && '... (truncated)'}
+                        </div>
+                      </ToolOutput>
+                    </ToolContent>
+                  </Tool>
+                )
+              })
+            }
           </div>
         )}
       </div>
